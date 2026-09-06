@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif-sc: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --font-sans-sc: "Noto Sans SC", "Source Han Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --color-ink-50: #faf8f5;
+  --color-ink-100: #f2eee7;
+  --color-ink-200: #e6dfd4;
+  --color-ink-800: #3f3a33;
+  --color-ink-900: #2b2722;
+  --color-ink-950: #1c1916;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-sans-sc);
+  background-color: var(--color-ink-50);
+  color: var(--color-ink-900);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 细滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(0 0 0 / 0.18) transparent;
+}
+
+/* TipTap 编辑器内容样式 */
+.prose-editor p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgb(168 162 158);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.prose-editor h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+.prose-editor h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+.prose-editor h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.prose-editor p {
+  margin: 0.25rem 0;
+}
+.prose-editor ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-editor ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.prose-editor blockquote {
+  border-left: 3px solid rgb(167 139 250);
+  padding-left: 0.75rem;
+  margin: 0.4rem 0;
+  color: rgb(87 83 78);
+}
+.prose-editor hr {
+  margin: 0.75rem 0;
+  border-top: 1px solid rgb(214 211 209);
+}
+.prose-editor a {
+  color: rgb(124 58 237);
+  text-decoration: underline;
+}
+
+/* 富文本静态展示 */
+.rich-display h1,
+.rich-display h2,
+.rich-display h3 {
+  font-weight: 600;
+}
+.rich-display h1 {
+  font-size: 1.2rem;
+}
+.rich-display h2 {
+  font-size: 1.1rem;
+}
+.rich-display ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.rich-display ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.rich-display blockquote {
+  border-left: 3px solid rgb(167 139 250);
+  padding-left: 0.75rem;
+  color: rgb(87 83 78);
+}
