@@ -9,11 +9,6 @@ const MODULE_PLAN: Record<string, { title: string; sprint: string; stories: stri
     sprint: 'Sprint 5',
     stories: ['US-301 全局时间线（虚拟滚动 2000 事件）', 'US-302 筛选', 'US-304 角色时间线'],
   },
-  graph: {
-    title: '人物关系图',
-    sprint: 'Sprint 4',
-    stories: ['US-401 力导向图（500 节点流畅）', 'US-402 点击详情/双击聚焦', 'US-403 导出 PNG/SVG'],
-  },
   foreshadowing: {
     title: '伏笔管理',
     sprint: 'Sprint 6',
@@ -44,7 +39,7 @@ export default function ModulePlaceholderPage() {
         title={plan ? `${plan.title} · 规划中` : '模块不存在'}
         description={
           plan
-            ? `该模块计划在 ${plan.sprint} 交付：${plan.stories.join('、')}。当前进行中的是 Sprint 0/1（项目管理与本地存储）。`
+            ? `该模块计划在 ${plan.sprint} 交付：${plan.stories.join('、')}。`
             : '请从左侧导航选择功能模块。'
         }
       />

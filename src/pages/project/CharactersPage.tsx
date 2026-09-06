@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { Plus, Search, Users } from 'lucide-react'
+import { AtSign, Plus, Search, Users } from 'lucide-react'
 import { Badge, Button, EmptyState, Field, Input, Modal, Select } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -9,6 +9,7 @@ import { createEntity } from '@/utils/common'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character, type ImportanceLevel } from '@/types'
 import { timeLabel } from '@/components/time/FlexibleTimeEditor'
 import { cn } from '@/components/ui'
+import { QuickCreateCharacterModal } from '@/components/people/QuickCreateCharacterModal'
 
 const IMPORTANCE_STYLE: Record<ImportanceLevel, string> = {
   protagonist: 'bg-violet-600 text-white',
@@ -26,6 +27,7 @@ export default function CharactersPage() {
   const [query, setQuery] = useState('')
   const [impFilter, setImpFilter] = useState<ImportanceLevel | 'all'>('all')
   const [creating, setCreating] = useState(false)
+  const [quick, setQuick] = useState(false)
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -46,9 +48,14 @@ export default function CharactersPage() {
           <h1 className="text-xl font-bold text-stone-900">人物</h1>
           <p className="mt-0.5 text-sm text-stone-500">{currentProject?.name} · 共 {characters.length} 人</p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)}>
-          <Plus className="size-4" /> 新建人物
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="subtle" onClick={() => setQuick(true)}>
+            <AtSign className="size-4" /> 快速建人
+          </Button>
+          <Button variant="primary" onClick={() => setCreating(true)}>
+            <Plus className="size-4" /> 新建人物
+          </Button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-3">
@@ -153,6 +160,18 @@ export default function CharactersPage() {
         </div>
       )}
 
+      {quick && (
+        <QuickCreateCharacterModal
+          projectId={projectId ?? ''}
+          characters={characters}
+          onClose={() => setQuick(false)}
+          onCreated={(id) => {
+            setQuick(false)
+            navigate(id)
+          }}
+          onDirty={() => void refresh()}
+        />
+      )}
       {creating && (
         <CreateCharacterModal
           projectId={projectId ?? ''}

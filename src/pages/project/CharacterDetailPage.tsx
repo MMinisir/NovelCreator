@@ -7,8 +7,10 @@ import { characterRepo, deleteCharacterCascade, eventRepo, locationRepo } from '
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character, type ImportanceLevel } from '@/types'
 import { RichTextEditor } from '@/components/rich/RichTextEditor'
 import { TagInput } from '@/components/people/TagInput'
+import { StateHistorySection } from '@/components/people/StateHistorySection'
 import { RelationshipSection } from '@/components/relationship/RelationshipSection'
 import { timeLabel } from '@/components/time/FlexibleTimeEditor'
+import type { FlexibleTimestamp } from '@/types'
 
 /** 人物详情编辑页（US-101/102：编辑字段、富文本备注、保存；US-107 关系区块） */
 export default function CharacterDetailPage() {
@@ -254,6 +256,13 @@ export default function CharacterDetailPage() {
           </div>
         </section>
       )}
+
+      {/* 人物状态历史（US-104） */}
+      <StateHistorySection
+        projectId={projectId}
+        characterId={char.id}
+        onCurrentStateChange={(current: { time: FlexibleTimestamp; state: string } | null) => patch({ currentState: current })}
+      />
 
       {/* 人物关系区块（US-107） */}
       <RelationshipSection projectId={projectId} character={char} characters={characters} />
