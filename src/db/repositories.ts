@@ -268,3 +268,21 @@ export async function deleteChapterCascade(chapterId: string): Promise<void> {
     await db.chapters.delete(chapterId)
   })
 }
+
+/** 删除伏笔：先解除全部大纲节点的埋设/回收引用再删除（Sprint 6 US-601 伏笔管理页） */
+export async function deleteForeshadowingCascade(foreshadowingId: string): Promise<void> {
+  await db.transaction('rw', [db.outline_nodes, db.foreshadowings], async () => {
+    const nodes = await db.outline_nodes.toArray()
+    for (const n of nodes) {
+      const p = n.foreshadowingPlantedIds ?? []
+      const r = n.foreshadowingResolvedIds ?? []
+      if (p.includes(foreshadowingId) || r.includes(foreshadowingId)) {
+        await db.outline_nodes.update(n.id, {
+          foreshadowingPlantedIds: p.filter((x) => x !== foreshadowingId),
+          foreshadowingResolvedIds: r.filter((x) => x !== foreshadowingId),
+        })
+      }
+    }
+    await db.foreshadowings.delete(foreshadowingId)
+  })
+}

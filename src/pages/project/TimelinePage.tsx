@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { List, type ListImperativeAPI, type RowComponentProps } from 'react-window'
-import { ArrowDown, ArrowUp, CalendarClock, Clock, Info } from 'lucide-react'
+import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, Info } from 'lucide-react'
 import { Badge, Button, EmptyState, Select, cn } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
-import { characterRepo, characterStateRepo, eventRepo, locationRepo } from '@/db/repositories'
+import { characterRepo, characterStateRepo, eventRepo, foreshadowingRepo, locationRepo } from '@/db/repositories'
 import { timeLabel } from '@/utils/time'
 import { EVENT_TYPES, EVENT_TYPE_STYLE } from '@/utils/eventTypes'
 import {
@@ -48,7 +48,7 @@ interface TimelineRowData {
   busy: boolean
 }
 
-/** 时间线页（Sprint 5：US-301 全局虚拟时间线 / US-302 筛选 / US-303 模糊排序 / US-304 角色时间线） */
+/** 时间线页（Sprint 5 US-301~304；Sprint 6 US-602 伏笔预期回收节点） */
 export default function TimelinePage() {
   const { projectId } = useParams<{ projectId: string }>()
   const currentProject = useProjectStore((s) => s.currentProject())
@@ -56,10 +56,12 @@ export default function TimelinePage() {
   const { items: characters } = useProjectEntityList(characterRepo, projectId)
   const { items: locations } = useProjectEntityList(locationRepo, projectId)
   const { items: allStates } = useProjectEntityList(characterStateRepo, projectId)
+  const { items: foreshadowings } = useProjectEntityList(foreshadowingRepo, projectId)
 
   const [person, setPerson] = useState<string>('all') // all = 全局时间线；选中 = 角色时间线
   const [locationId, setLocationId] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
+  const [showForeshadowings, setShowForeshadowings] = useState(true) // US-602 伏笔预期回收节点开关
   const [busy, setBusy] = useState(false)
   const listRef = useRef<ListImperativeAPI | null>(null)
 
@@ -79,15 +81,17 @@ export default function TimelinePage() {
       buildTimelineItems({
         events,
         states: statesForPerson,
+        foreshadowings: showForeshadowings ? foreshadowings : [],
         charById: (id) => charById.byId(id),
       }),
-    [events, statesForPerson, charById],
+    [events, statesForPerson, foreshadowings, showForeshadowings, charById],
   )
 
-  /** 筛选（US-302）：人物参与 / 地点 / 类型；状态行不受地点类型筛选影响 */
+  /** 筛选（US-302）：人物参与 / 地点 / 类型；状态行不受地点类型筛选影响；伏笔行按相关人物过滤 */
   const rows = useMemo(() => {
     return baseRows.filter((r) => {
       if (r.kind === 'state') return true
+      if (r.kind === 'foreshadow') return person === 'all' || r.participantIds.includes(person)
       if (person !== 'all' && !r.participantIds.includes(person)) return false
       if (locationId !== 'all' && r.locationId !== locationId) return false
       if (typeFilter !== 'all' && r.eventType !== typeFilter) return false
@@ -97,6 +101,11 @@ export default function TimelinePage() {
 
   const selectedChar = person !== 'all' ? charById.byId(person) : null
   const manualCount = rows.filter((r) => r.kind === 'event' && manualKindOf(r.time)).length
+  /** 已锚定预期回收事件的活跃伏笔数（开关计数用） */
+  const anchoredForeshadowCount = foreshadowings.filter(
+    (f) => f.status === 'active' && Boolean(f.expectedResolveEventId),
+  ).length
+  const foreshadowRowCount = rows.filter((r) => r.kind === 'foreshadow').length
 
   useEffect(() => {
     if (rows.length > 0) listRef.current?.scrollToRow({ index: 0, align: 'start' })
@@ -162,7 +171,10 @@ export default function TimelinePage() {
             {selectedChar && ` · 含 ${statesForPerson.length} 次状态变化`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <Link to="../foreshadowing" className="text-sm font-medium text-sky-600 hover:text-sky-800">
+            伏笔管理 <span aria-hidden>→</span>
+          </Link>
           <Link to="../events" className="text-sm font-medium text-violet-600 hover:text-violet-800">
             去事件页管理 <span aria-hidden>→</span>
           </Link>
@@ -201,6 +213,20 @@ export default function TimelinePage() {
             ))}
           </Select>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowForeshadowings((v) => !v)}
+          title="显示/隐藏活跃伏笔的预期回收节点（US-602）"
+          className={cn(
+            'inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+            showForeshadowings
+              ? 'bg-sky-700 text-white'
+              : 'border border-stone-200 bg-white text-stone-500 hover:border-sky-300 hover:text-sky-700',
+          )}
+        >
+          <Anchor className="size-3.5" />
+          伏笔节点 {anchoredForeshadowCount}
+        </button>
         <div className="flex flex-wrap gap-1.5">
           {(['all', ...EVENT_TYPES] as const).map((t) => (
             <button
@@ -279,9 +305,10 @@ function TimelineRow({
   const prev = rows[index - 1]
   const next = rows[index + 1]
   const isEvent = row.kind === 'event'
+  const isForeshadow = row.kind === 'foreshadow'
   const canUp = isEvent && canSwapAdjacent(row.time, prev?.time) && !busy
   const canDown = isEvent && canSwapAdjacent(row.time, next?.time) && !busy
-  const dotColor = isEvent ? 'bg-violet-500' : 'border-2 border-amber-500 bg-white'
+  const dotColor = isEvent ? 'bg-violet-500' : isForeshadow ? 'bg-sky-500' : 'border-2 border-amber-500 bg-white'
 
   return (
     <div style={style} className="relative w-full pr-1">
@@ -291,7 +318,7 @@ function TimelineRow({
       <div className="ml-10 flex h-[80px] items-stretch gap-3 rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
         {/* 时间标签 */}
         <div className="w-28 shrink-0 pt-0.5">
-          <div className={cn('text-xs font-semibold', isEvent ? 'text-violet-700' : 'text-amber-700')}>
+          <div className={cn('text-xs font-semibold', isEvent ? 'text-violet-700' : isForeshadow ? 'text-sky-700' : 'text-amber-700')}>
             {timeLabel(row.time) || '时间未定'}
           </div>
           {row.importance && row.importance > 0 && (
@@ -301,12 +328,31 @@ function TimelineRow({
         {/* 主体 */}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {!isEvent && (
+            {row.kind === 'state' && (
               <>
                 <Badge color="amber">{row.charName}</Badge>
                 <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium', STATE_KIND_STYLE[row.stateKind ?? 'custom'])}>
                   {STATE_KIND_LABEL[row.stateKind ?? 'custom']}
                 </span>
+              </>
+            )}
+            {isForeshadow && (
+              <>
+                <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">⚓ 待回收伏笔</span>
+                {row.priority && (
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                      row.priority === 'high'
+                        ? 'bg-red-100 text-red-700'
+                        : row.priority === 'medium'
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-stone-200 text-stone-600',
+                    )}
+                  >
+                    {row.priority === 'high' ? '高优先' : row.priority === 'medium' ? '中优先' : '低优先'}
+                  </span>
+                )}
               </>
             )}
             <h3 className="truncate font-serif-sc text-sm font-bold text-stone-900">{row.name}</h3>
@@ -317,6 +363,11 @@ function TimelineRow({
             )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400">
+            {isForeshadow && (
+              <span className="inline-flex items-center gap-1 font-medium text-sky-700">
+                <Anchor className="size-3.5" /> 预期回收于「{row.anchorEventName ?? '未命名事件'}」
+              </span>
+            )}
             {isEvent && locName(row.locationId) && <span>📍 {locName(row.locationId)}</span>}
             {isEvent && row.participantIds.length > 0 && (
               <span className="truncate">

@@ -20,14 +20,16 @@ export const FORESHADOWING_STATUS_LABELS: Record<ForeshadowingStatus, string> = 
   abandoned: '已废弃',
 }
 
-/** 伏笔实体（设计文档 §2.7.1） */
+/** 伏笔实体（设计文档 §2.7.1；Sprint 6 US-601 独立管理页开放） */
 export interface Foreshadowing extends BaseEntity {
   /** 伏笔描述，如 “主角捡到的神秘戒指” */
   description: string
-  /** 埋设位置 */
+  /** 埋设位置（大纲/章节级记录，另见大纲节点 foreshadowingPlantedIds 闭环） */
   plantedAt?: StoryLocation
-  /** 预期回收位置 */
+  /** 预期回收位置（文本记录） */
   expectedResolveAt?: StoryLocation
+  /** 预期回收事件锚点（US-602 时间线伏笔节点取该事件时间） */
+  expectedResolveEventId?: string
   status: ForeshadowingStatus
   /** 实际回收位置 */
   resolvedAt?: StoryLocation

@@ -1,22 +1,24 @@
 import type { CharacterState, CharacterStateKind, FlexibleTimestamp, StoryEvent } from '@/types'
+import type { Foreshadowing } from '@/types/meta'
+import type { Priority } from '@/types/base'
 import { compareFlexibleTime } from '@/utils/time'
 
 /**
- * 时间线领域工具（Sprint 5 US-301~304）：
- * - 事件与人物状态变化合并为统一条目（角色时间线 US-304）
+ * 时间线领域工具（Sprint 5 US-301~304 / Sprint 6 US-602）：
+ * - 事件、人物状态变化、伏笔（预期回收锚点）合并为统一条目
  * - 排序：compareFlexibleTime 类别主序（relative<fuzzy<chapter<exact），同类并列按 updatedAt 倒序
  * - 手动排序：fuzzy/relative 事件可在同类段内上移/下移，写入 time.sortOrder（US-303）
  */
 
-export type TimelineItemKind = 'event' | 'state'
+export type TimelineItemKind = 'event' | 'state' | 'foreshadow'
 
-/** 时间线条目（事件 或 人物状态变化） */
+/** 时间线条目（事件 / 人物状态变化 / 伏笔预期回收节点） */
 export interface TimelineItem {
   key: string
   kind: TimelineItemKind
   id: string
   time: FlexibleTimestamp
-  /** 事件名 / 状态摘要 */
+  /** 事件名 / 状态摘要 / 伏笔描述 */
   name: string
   /** 事件类型 */
   eventType?: string
@@ -27,6 +29,10 @@ export interface TimelineItem {
   /** 状态条目所属人物名（未知时显示“未知”） */
   charName?: string
   stateKind?: CharacterStateKind
+  /** 伏笔优先级 */
+  priority?: Priority
+  /** 伏笔锚定的预期回收事件名 */
+  anchorEventName?: string
   updatedAt: string
 }
 
@@ -39,10 +45,11 @@ export function compareTimelineItems(
   return b.updatedAt.localeCompare(a.updatedAt)
 }
 
-/** 构建并排序时间线条目：states 传入时合并（角色时间线），否则仅事件 */
+/** 构建并排序时间线条目：states 传入时合并（角色时间线 US-304）；foreshadowings 传入时合并预期回收节点（US-602） */
 export function buildTimelineItems(options: {
   events: StoryEvent[]
   states?: CharacterState[]
+  foreshadowings?: Foreshadowing[]
   charById: (id: string) => { name: string } | undefined
 }): TimelineItem[] {
   const items: TimelineItem[] = []
@@ -72,6 +79,24 @@ export function buildTimelineItems(options: {
       participantIds: [s.characterId],
       stateKind: s.kind,
       updatedAt: s.updatedAt,
+    })
+  }
+  // 活跃且锚定预期回收事件的伏笔：取其锚定事件的时间作为节点位置
+  const evById = new Map(options.events.map((e) => [e.id, e]))
+  for (const f of options.foreshadowings ?? []) {
+    if (f.status !== 'active' || !f.expectedResolveEventId) continue
+    const anchor = evById.get(f.expectedResolveEventId)
+    if (!anchor) continue
+    items.push({
+      key: `foreshadow:${f.id}`,
+      kind: 'foreshadow',
+      id: f.id,
+      time: anchor.time,
+      name: f.description,
+      participantIds: f.relatedCharacterIds,
+      priority: f.priority,
+      anchorEventName: anchor.name,
+      updatedAt: f.updatedAt,
     })
   }
   return items.sort(compareTimelineItems)

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, FileText, PenLine, Plus, Target, Trash2 } from 'lucide-react'
+import { CheckCircle2, Download, FileText, PenLine, Plus, Target, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { chapterRepo, deleteChapterCascade, outlineRepo } from '@/db/repositories'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
-import { createEntity } from '@/utils/common'
+import { createEntity, downloadTextFile } from '@/utils/common'
+import { chaptersToMarkdown } from '@/utils/markdown'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import { CHAPTER_STATUS_LABELS } from '@/types/chapter'
@@ -71,6 +72,13 @@ export default function WritingPage() {
     void refresh()
   }
 
+  /** US-701：导出全部章节为 Markdown（按写作区顺序） */
+  function handleExport() {
+    const md = chaptersToMarkdown(project?.name ?? '', sorted)
+    const date = new Date().toISOString().slice(0, 10)
+    downloadTextFile(`${project?.name ?? '未命名作品'}-正文-${date}.md`, md, 'text/markdown')
+  }
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -80,9 +88,19 @@ export default function WritingPage() {
             {project?.name} · 共 {chapters.length} 章 · 正文自动保存到本地
           </p>
         </div>
-        <Button variant="primary" onClick={() => setCreating(true)} disabled={!projectId}>
-          <Plus className="size-4" /> 新建章节
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={handleExport}
+            disabled={!loaded || sorted.length === 0}
+            title="将全部章节导出为 Markdown 文件"
+          >
+            <Download className="size-4" /> 导出 Markdown
+          </Button>
+          <Button variant="primary" onClick={() => setCreating(true)} disabled={!projectId}>
+            <Plus className="size-4" /> 新建章节
+          </Button>
+        </div>
       </div>
 
       {!loaded ? (
