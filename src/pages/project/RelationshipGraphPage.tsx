@@ -55,7 +55,6 @@ export default function RelationshipGraphPage() {
       cy = cytoscape({
         container: containerRef.current,
         elements: buildElements(characters, relationships),
-        wheelSensitivity: 0.3,
         style: [
           {
             selector: 'node',
