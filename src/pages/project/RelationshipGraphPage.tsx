@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ExternalLink, Focus, Maximize2, RotateCcw, Share2, Tag } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Focus, Maximize2, RotateCcw, Share2, Tag } from 'lucide-react'
 import cytoscape, { type Core, type ElementDefinition, type EventObject } from 'cytoscape'
 import { Badge, Button, EmptyState } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -37,6 +37,7 @@ export default function RelationshipGraphPage() {
   const [selection, setSelection] = useState<Selection>(null)
   const [showEdgeLabel, setShowEdgeLabel] = useState(false)
   const [graphKey, setGraphKey] = useState(0)
+  const [graphError, setGraphError] = useState<string | null>(null)
 
   const { items: characters, loaded: charsLoaded } = useProjectEntityList(characterRepo, projectId)
   const { items: relationships, loaded: relsLoaded } = useProjectEntityList(relationshipRepo, projectId)
@@ -49,64 +50,67 @@ export default function RelationshipGraphPage() {
   // 建图（依赖图数据，重挂时重建）
   useEffect(() => {
     if (!containerRef.current || !charsLoaded || !relsLoaded) return
-    const cy = cytoscape({
-      container: containerRef.current,
-      elements: buildElements(characters, relationships),
-      wheelSensitivity: 0.3,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': 'data(bg)',
-            color: 'data(color)',
-            width: 'data(w)',
-            height: 'data(h)',
-            shape: 'round-rectangle',
-            label: 'data(name)',
-            'font-size': 13,
-            'font-weight': 700,
-            'text-wrap': 'wrap',
-            'text-max-width': 'data(maxw)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'border-width': 0,
-            'border-color': '#ffffff',
-            'transition-property': 'border-width, border-color, background-color',
-            'transition-duration': 150,
+    let cy: Core | null = null
+    try {
+      cy = cytoscape({
+        container: containerRef.current,
+        elements: buildElements(characters, relationships),
+        wheelSensitivity: 0.3,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'background-color': 'data(bg)',
+              color: 'data(color)',
+              width: 'data(w)',
+              height: 'data(h)',
+              shape: 'round-rectangle',
+              label: 'data(name)',
+              'font-size': 13,
+              'font-weight': 700,
+              'text-wrap': 'wrap',
+              'text-max-width': 'data(maxw)',
+              'text-valign': 'center',
+              'text-halign': 'center',
+              'border-width': 0,
+              'border-color': '#ffffff',
+              'transition-property': 'border-width, border-color, background-color',
+              'transition-duration': 150,
+            },
           },
-        },
-        {
-          selector: 'node:selected',
-          style: { 'border-width': 4, 'border-color': '#f59e0b' },
-        },
-        {
-          selector: 'edge',
-          style: {
-            width: 'data(width)',
-            'line-color': 'data(color)',
-            'target-endpoint': 'none',
-            label: 'data(type)',
-            'font-size': 11,
-            color: '#78716c',
-            'text-rotation': 'autorotate',
-            'text-background-color': '#ffffff',
-            'text-background-opacity': 0.85,
-            'text-background-padding': '2px',
+          {
+            selector: 'node:selected',
+            style: { 'border-width': 4, 'border-color': '#f59e0b' },
           },
-        },
-        { selector: 'edge.unlabeled', style: { label: '' } },
-        {
-          selector: 'edge:selected',
-          style: {
-            width: 5,
-            'line-color': '#f59e0b',
-            'target-arrow-color': '#f59e0b',
-            'source-arrow-color': '#f59e0b',
+          {
+            selector: 'edge',
+            style: {
+              width: 'data(width)',
+              'line-color': 'data(color)',
+              label: 'data(type)',
+              'font-size': 11,
+              color: '#78716c',
+              'text-rotation': 'autorotate',
+              'text-background-color': '#ffffff',
+              'text-background-opacity': 0.85,
+              'text-background-padding': '2px',
+            },
           },
-        },
-      ],
-      layout: { name: 'cose', animate: false, padding: 40, nodeRepulsion: () => 9000, idealEdgeLength: () => 130 },
-    })
+          { selector: 'edge.unlabeled', style: { label: '' } },
+          {
+            selector: 'edge:selected',
+            style: { width: 5, 'line-color': '#f59e0b' },
+          },
+        ],
+        layout: { name: 'cose', animate: false, padding: 40, nodeRepulsion: () => 9000, idealEdgeLength: () => 130 },
+      })
+    } catch (err) {
+      // 清理可能残留的半初始化画布，避免重挂时双实例
+      if (containerRef.current) containerRef.current.innerHTML = ''
+      setGraphError(err instanceof Error ? err.message : String(err))
+      return
+    }
+    setGraphError(null)
     cyRef.current = cy
 
     cy.on('tap', 'node', (e: EventObject) => {
@@ -201,6 +205,17 @@ export default function RelationshipGraphPage() {
             >
               去人物页 <ExternalLink className="size-3.5" />
             </Link>
+          }
+        />
+      ) : graphError ? (
+        <EmptyState
+          icon={<AlertTriangle className="size-6" />}
+          title="关系图初始化失败"
+          description={`${graphError}。可点击“重新布局”重试，或检查浏览器控制台。`}
+          action={
+            <Button variant="subtle" size="sm" onClick={() => setGraphKey((k) => k + 1)}>
+              <RotateCcw className="size-4" /> 重新尝试
+            </Button>
           }
         />
       ) : (
