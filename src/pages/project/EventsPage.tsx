@@ -10,21 +10,10 @@ import { compareFlexibleTime } from '@/utils/time'
 import type { Character, FlexibleTimestamp, Location, StoryEvent } from '@/types'
 import { CharacterMultiSelect } from '@/components/people/CharacterMultiSelect'
 import { RichTextEditor } from '@/components/rich/RichTextEditor'
-import { FlexibleTimeEditor, timeLabel } from '@/components/time/FlexibleTimeEditor'
+import { FlexibleTimeEditor } from '@/components/time/FlexibleTimeEditor'
+import { timeLabel } from '@/utils/time'
 
-export const EVENT_TYPES = ['主线', '支线', '日常', '战斗', '感情', '转折', '伏笔', '回收', '其他']
-
-const TYPE_STYLE: Record<string, string> = {
-  主线: 'bg-violet-100 text-violet-700',
-  支线: 'bg-sky-100 text-sky-700',
-  日常: 'bg-stone-100 text-stone-600',
-  战斗: 'bg-red-100 text-red-700',
-  感情: 'bg-rose-100 text-rose-700',
-  转折: 'bg-amber-100 text-amber-700',
-  伏笔: 'bg-orange-100 text-orange-700',
-  回收: 'bg-emerald-100 text-emerald-700',
-  其他: 'bg-stone-100 text-stone-600',
-}
+import { EVENT_TYPES, EVENT_TYPE_STYLE } from '@/utils/eventTypes'
 
 /** 事件管理页（US-106：创建/编辑事件，含时间戳、参与者、地点、结果，按时间排序） */
 export default function EventsPage() {
@@ -140,7 +129,9 @@ export default function EventsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-serif-sc text-base font-bold text-stone-900">{e.name}</h3>
-                    <span className={cn('rounded-full px-2 py-0.5 text-xs', TYPE_STYLE[e.type] ?? TYPE_STYLE['其他'])}>
+                    <span
+                      className={cn('rounded-full px-2 py-0.5 text-xs', EVENT_TYPE_STYLE[e.type] ?? EVENT_TYPE_STYLE['其他'])}
+                    >
                       {e.type}
                     </span>
                   </div>

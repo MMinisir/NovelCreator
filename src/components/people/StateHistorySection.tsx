@@ -15,7 +15,8 @@ import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { characterRepo, characterStateRepo } from '@/db/repositories'
 import { createEntity } from '@/utils/common'
 import type { CharacterState, CharacterStateKind, FlexibleTimestamp } from '@/types'
-import { FlexibleTimeEditor, timeLabel } from '@/components/time/FlexibleTimeEditor'
+import { FlexibleTimeEditor } from '@/components/time/FlexibleTimeEditor'
+import { timeLabel } from '@/utils/time'
 
 const KIND_META: Array<{ value: CharacterStateKind; label: string; badge: 'violet' | 'green' | 'amber' | 'red' | 'slate' | 'sky' }> = [
   { value: 'upgrade', label: '升级', badge: 'violet' },

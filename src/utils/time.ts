@@ -27,3 +27,18 @@ function rank(t?: FlexibleTimestamp): [number, number] {
       return [0, t.sortOrder ?? 0]
   }
 }
+
+/** 生成可展示的时间标签，如 “第3章” / “2024-03-15” / “春天” */
+export function timeLabel(t?: FlexibleTimestamp): string {
+  if (!t) return ''
+  switch (t.type) {
+    case 'exact':
+      return t.value.slice(0, 10) || ''
+    case 'chapter': {
+      const n = Number(t.value)
+      return Number.isFinite(n) && n > 0 ? `第${t.value}章` : t.value || ''
+    }
+    default:
+      return t.label || t.value || ''
+  }
+}

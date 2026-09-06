@@ -7,7 +7,7 @@ import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { characterRepo } from '@/db/repositories'
 import { createEntity } from '@/utils/common'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character, type ImportanceLevel } from '@/types'
-import { timeLabel } from '@/components/time/FlexibleTimeEditor'
+import { timeLabel } from '@/utils/time'
 import { cn } from '@/components/ui'
 import { QuickCreateCharacterModal } from '@/components/people/QuickCreateCharacterModal'
 

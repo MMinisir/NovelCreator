@@ -12,6 +12,7 @@ import EventsPage from '@/pages/project/EventsPage'
 import OutlinePage from '@/pages/project/OutlinePage'
 import WritingPage from '@/pages/project/WritingPage'
 import RelationshipGraphPage from '@/pages/project/RelationshipGraphPage'
+import TimelinePage from '@/pages/project/TimelinePage'
 
 /** 路由结构（设计文档 §6.1 导航：项目 -> 人物/地点/事件/大纲/时间线/关系图/伏笔/写作/灵感/设置） */
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="outline" element={<OutlinePage />} />
           <Route path="writing" element={<WritingPage />} />
           <Route path="graph" element={<RelationshipGraphPage />} />
+          <Route path="timeline" element={<TimelinePage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
           <Route path=":module" element={<ModulePlaceholderPage />} />
         </Route>

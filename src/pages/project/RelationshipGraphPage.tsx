@@ -6,7 +6,7 @@ import { Badge, Button, EmptyState } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { characterRepo, relationshipRepo } from '@/db/repositories'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character, type ImportanceLevel, type Relationship } from '@/types'
-import { timeLabel } from '@/components/time/FlexibleTimeEditor'
+import { timeLabel } from '@/utils/time'
 import { cn } from '@/components/ui'
 
 /** 节点配色：按重要程度（背景、文字、尺寸） */

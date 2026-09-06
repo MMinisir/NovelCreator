@@ -9,7 +9,7 @@ import { RichTextEditor } from '@/components/rich/RichTextEditor'
 import { TagInput } from '@/components/people/TagInput'
 import { StateHistorySection } from '@/components/people/StateHistorySection'
 import { RelationshipSection } from '@/components/relationship/RelationshipSection'
-import { timeLabel } from '@/components/time/FlexibleTimeEditor'
+import { timeLabel } from '@/utils/time'
 import type { FlexibleTimestamp } from '@/types'
 
 /** 人物详情编辑页（US-101/102：编辑字段、富文本备注、保存；US-107 关系区块） */

@@ -4,11 +4,6 @@ import { EmptyState } from '@/components/ui'
 
 /** 各功能模块占位页：标注规划中的 Sprint（依据执行案迭代计划） */
 const MODULE_PLAN: Record<string, { title: string; sprint: string; stories: string[] }> = {
-  timeline: {
-    title: '时间线',
-    sprint: 'Sprint 5',
-    stories: ['US-301 全局时间线（虚拟滚动 2000 事件）', 'US-302 筛选', 'US-304 角色时间线'],
-  },
   foreshadowing: {
     title: '伏笔管理',
     sprint: 'Sprint 6',
