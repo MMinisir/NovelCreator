@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, CheckCircle2, Save, Trash2, Users } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Save, Sparkles, Trash2, Users } from 'lucide-react'
+import CharacterBioModal from '@/components/ai/CharacterBioModal'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Select, Textarea } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { characterRepo, deleteCharacterCascade, eventRepo, locationRepo } from '@/db/repositories'
@@ -25,6 +26,7 @@ export default function CharacterDetailPage() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [bioAIOpen, setBioAIOpen] = useState(false) // US-803 AI 生成人物小传
 
   useEffect(() => {
     let alive = true
@@ -213,9 +215,31 @@ export default function CharacterDetailPage() {
           <RichTextEditor value={char.appearance} onChange={(html) => patch({ appearance: html })} placeholder="外表特征、服饰、气质……" />
         </div>
         <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-stone-400">背景故事</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-400">背景故事</h2>
+            <button
+              type="button"
+              onClick={() => setBioAIOpen(true)}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-violet-800"
+            >
+              <Sparkles className="size-3.5" /> AI 生成小传
+            </button>
+          </div>
           <RichTextEditor value={char.background} onChange={(html) => patch({ background: html })} placeholder="身世、过往经历……" minHeight="min-h-48" />
         </div>
+        {bioAIOpen && (
+          <CharacterBioModal
+            character={char}
+            onClose={() => setBioAIOpen(false)}
+            onApplied={(html) => {
+              setBioAIOpen(false)
+              if (!char) return
+              void characterRepo.update(char.id, { background: html }).then(() => {
+                setDraft((d) => (d ? { ...d, background: html } : d))
+              })
+            }}
+          />
+        )}
       </section>
 
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">

@@ -6,6 +6,8 @@ import { useProjectStore } from '@/stores/projectStore'
 import { PROJECT_STATUS_LABELS, PROJECT_TEMPLATE_LABELS } from '@/types/project'
 import type { Project, ProjectMode, ProjectStatus } from '@/types/project'
 import { PROJECT_GENRES } from '@/components/project/ProjectFormModal'
+import AIConfigPanel from '@/components/ai/AIConfigPanel'
+import BackupPanel from '@/components/backup/BackupPanel'
 
 const NARRATIONS = ['第三人称限知视角', '第三人称全知视角', '第一人称', '多视角', '其他']
 
@@ -240,6 +242,10 @@ export default function ProjectSettingsPage() {
           </label>
         </div>
       </section>
+
+      {/* AI 服务配置（US-801）与自动备份（US-702/703）：面板内按钮均为 type=button，不会提交项目表单 */}
+      <AIConfigPanel />
+      <BackupPanel projectId={projectId ?? ''} />
     </form>
   )
 }

@@ -22,7 +22,11 @@
 | `components/rich/RichTextEditor.tsx` | TipTap 封装（StarterKit），value/onChange=**HTML 字符串** |
 | `components/layout/` | 应用壳：侧栏导航/顶栏 |
 | `components/{people,relationship,project,time,outline}/` | 分模块组件（如 outline 下 OutlineSetupCards / OutlineNodeEditor）；time/FlexibleTimeEditor 灵活时间编辑 |
-| `services/ai/` | **AI 服务层（Sprint 5 预研）**：`types.ts`(AIProvider 接口/AIChatOptions/AIProviderConfig)、`openaiCompat.ts`(OpenAI 兼容 Provider + createAIProvider 工厂)、`contextBuilder.ts`(项目/人物上下文纯函数)；无 UI，Sprint 7 US-801 开放 |
+| `services/ai/` | **AI 服务层（Sprint 5 预研 + Sprint 7 开放）**：`types.ts`(AIProvider 接口/AIProviderConfig)、`openaiCompat.ts`(OpenAI 兼容 Provider + createAIProvider)、`contextBuilder.ts`(项目/人物上下文纯函数)、**`config.ts`**(US-801 配置 localStorage + 服务商预设)、**`tasks.ts`**(US-802~804 生成与解析：generateSynopsisText/parseSynopsis、generateCharacterBioText、generateRelationshipSuggestions/parseRelationshipSuggestions) |
+| `services/backup.ts` | **自动备份与恢复（US-702/703）**：FSA 目录选择/权限、AES-GCM+PBKDF2 加解密、writeBackup / runAutoBackupIfDue / restoreFromBackupText |
+| `components/ai/` | AIConfigPanel（US-801 配置+测试连接）、SynopsisGeneratorModal（US-802）、CharacterBioModal（US-803）、RelationshipSuggestModal（US-804） |
+| `components/backup/BackupPanel.tsx` | 备份面板（选目录/间隔/加密口令/立即备份/从文件恢复），挂在项目设置页底部 |
+| `hooks/` | `useProjectEntityList`、`useAITask`(AI 生成 loading/error/取消状态机)、`useAutoBackup`(60s 轮询自动备份) |
 | `utils/eventTypes.ts` | 共享事件类型与配色（EVENT_TYPES / EVENT_TYPE_STYLE，事件页+时间线复用） |
 | `utils/timeline.ts` | 时间线领域纯函数：TimelineItem 构建/排序（kind=event/state/foreshadow，US-602 伏笔按预期回收事件锚定）、manualKindOf、段归一 normalizeManualSegment/needsManualNormalize、swapManualNeighbors |
 | `utils/markdown.ts` | **Markdown 导出（US-701）**：`htmlToMarkdown`（TipTap HTML 受控子集→md，纯函数）+ `chaptersToMarkdown` 组装（头部元信息+按写作顺序章节） |
@@ -34,7 +38,7 @@
 
 ## 3. 数据层约定
 
-- 表：projects / characters / states(人物状态历史) / arcs(人物弧光) / relationships / locations / events / **outline_nodes** / **chapters** / chapter_versions / scenes / **foreshadowings**(Sprint 6 启用) / **idea_fragments**(Sprint 6 启用，kind: text 预留 voice/photo) / comments / prompt_templates / backup_metadata（后 3 个多为 Sprint 7+ 预留）。
+- 表：projects / characters / states(人物状态历史) / arcs(人物弧光) / relationships / locations / events / **outline_nodes** / **chapters** / chapter_versions / scenes / **foreshadowings**(S6) / **idea_fragments**(S6) / **backup_settings**(S7 新增，单条 id='auto'，存 FSA 目录句柄) / comments / prompt_templates / backup_metadata（后 2 个多为 Sprint 8+ 预留）。Dexie schema 已到 **version 2**（新增表无需 upgrade 迁移）；导出文件版本常量 `DB_VERSION` 仍为 1（数据格式未变）。
 - 主键：`createEntity(projectId, fields)` 生成（id = 随机串全局唯一）。通用字段：`id/projectId/createdAt/updatedAt`。软删除：projects 有 `deletedAt`，别家用 `repo.remove()` 物理删。
 - 各 repo 形如 `outlineRepo = { listByProject, add, update(id, patch), remove }`，patch 是 `Partial` 按 id merge。
 - **富文本一律 HTML 字符串**（TipTap 输出含 `<p>`、`<blockquote>` 等）；字数统一 `utils/text.ts countWords()`（去 HTML 标签按中文/英文词计）。
@@ -60,7 +64,7 @@
 | 4 | 人物状态历史 US-104、@快速建人 US-108、关系图 US-401/402（Cytoscape） | ✅（本轮） |
 | 5 | 时间线 react-window（US-301~304）+ AI Provider 预研 | ✅（本轮） |
 | 6 | 伏笔管理（US-601/602）、导出 Markdown（US-701）、PWA 速记（US-901） | ✅（本轮） |
-| 7 | AI 功能开放（US-801~804）、自动备份（US-702/703） | 规划 |
+| 7 | AI 功能开放（US-801~804）、自动备份（US-702/703） | ✅（本轮） |
 | 8 | 一致性/写作辅助/版本历史（US-501b,504,505,805） | 规划 |
 | 9 | AI 审稿与移动端（US-806,805-LLM,902,903） | 规划 |
 | 10 | 协作批注、DOCX/PDF 导出、体检报告（US-1001,701,新增） | 规划 |
@@ -72,8 +76,8 @@
 - **伏笔管理（Sprint 6 已交付）**：路由 `/projects/:id/foreshadowing`（ForeshadowingsPage）。列表状态筛选（全部/活跃/已回收/已废弃）+ 优先级/预期回收事件/相关人物展示；新建/编辑 Modal（描述必填；**预期回收事件**锚到事件 → 时间线节点）；删除走 `deleteForeshadowingCascade`（自动解除全部大纲节点 planted/resolved 引用）。大纲节点侧（OutlineNodeEditor）埋设/回收闭环仍可用。
 - **Markdown 导出（US-701）**：写作页头部「导出 Markdown」→ `chaptersToMarkdown` 组装（# 作品名 + 元信息 + 按顺序各章 `## 标题` + 状态/字数 + htmlToMarkdown 正文）。htmlToMarkdown 支持子集：h1-6/p/strong/em/code/s/del/a/br/img/blockquote/ul/ol(嵌套)/hr/pre。DOCX/PDF 留 Sprint 10。
 - **PWA/灵感碎片（US-901 简版）**：vite-plugin-pwa generateSW（autoUpdate，dist 产物 sw.js + registerSW.js + manifest.webmanifest；图标用 /favicon.svg 简版，未含 png 图标故移动端可能无安装提示——验收以离线可用为准）；灵感碎片页 `/projects/:id/ideas`（IdeaFragment: content/tags[]/kind:text，搜索、点标签筛选、删除）。
-- **AI 层（Sprint 5 预研）**：`src/services/ai/` 仅骨架无 UI——Provider 抽象（chat/testConnection + AbortSignal）、OpenAI 兼容实现（/v1/chat/completions，baseURL 可配，浏览器直连受 CORS 限制，正式版走本地代理）、上下文构建器（buildProjectContextBrief / buildCharacterContextBrief 纯函数，本地拼提示不发请求）。US-801 配置界面 Sprint 7 开放。
-- **AI 层（Sprint 5 预研）**：`src/services/ai/` 仅骨架无 UI——Provider 抽象（chat/testConnection + AbortSignal）、OpenAI 兼容实现（/v1/chat/completions，baseURL 可配，浏览器直连受 CORS 限制，正式版走本地代理）、上下文构建器（buildProjectContextBrief / buildCharacterContextBrief 纯函数，本地拼提示不发请求）。US-801 配置界面 Sprint 7 开放。
+- **AI 层（Sprint 7 开放）**：Provider 抽象 + OpenAI 兼容实现（baseURL 可配，覆盖 DeepSeek/Moonshot/Ollama 等兼容端点；浏览器直连受 CORS 限制，跨域失败请自建代理并改 baseURL）。配置存 localStorage（`novel-creator.ai-config.v1`，含 API Key，仅本机），入口=项目设置页底部「AI 服务配置」（预设选择 + 测试连接）。生成任务统一走 `services/ai/tasks.ts` + `hooks/useAITask`（loading/错误/AbortController 取消）：US-802 五句话梗概（大纲页 LoglineCard「AI 生成」→ 可编辑 → `applySynopsis` 写 5 个 synopsis_item）、US-803 人物小传（人物详情页「AI 生成小传」→ 写入 background，纯文本经 `textToHtmlParagraphs` 转 `<p>`）、US-804 关系建议（关系图页「AI 关系建议」→ JSON 候选勾选 → 写入 relationships，按 sourceId<targetId 归一、已存在自动跳过）。
+- **自动备份（US-702/703）**：File System Access API 选目录，句柄持久化到 `backup_settings`（IndexedDB 可结构化克隆），重开页面需重新授权写入；可选 AES-GCM（PBKDF2 100k）口令加密，口令存 localStorage（`novel-creator.backup-passphrase.v1`）；`useAutoBackup` 每 60s 检查间隔（默认 60 分钟）触发。恢复=选择备份文件（加密需口令）→ `importProjectFromJson(asNewProject=true)` 导入为副本，不覆盖现有数据。不支持 FSA 的浏览器（Firefox/Safari）自动备份禁用，仅能手动导出/恢复。
 - 事件类型常量（EVENT_TYPES/EVENT_TYPE_STYLE）统一在 `utils/eventTypes.ts`；富文本显示用 `.rich-display` 容器 + `line-clamp`。
 - **US-206 细纲→草稿生成** → 已在 Sprint 3 前瞻实现（大纲 Editor 一键建草稿并跳写作区 `?chapter=id`）。
 - 正文写作区「五句话→自动展开分幕」三步引导 → 放 Sprint 5 时间线联动后。
@@ -93,7 +97,12 @@
 
 ## 8. 最近变更
 
-### Sprint 6（本轮）
+### Sprint 7（本轮）
+- 新增：`services/ai/config.ts`（配置 localStorage + 4 个服务商预设）、`services/ai/tasks.ts`（US-802~804 生成与结果解析）、`services/backup.ts`（FSA 目录/AES-GCM 加密/写入与恢复）、`components/ai/{AIConfigPanel,SynopsisGeneratorModal,CharacterBioModal,RelationshipSuggestModal}.tsx`、`components/backup/BackupPanel.tsx`、`hooks/{useAITask,useAutoBackup}.ts`。
+- 修改：`types/meta.ts` 增 `BackupSettings`；`db/database.ts` 增 **version(2)** 表 `backup_settings`（DB_VERSION 仍 1）；`db/repositories.ts` 增 `loadBackupSettings/saveBackupSettings`；`services/outline.ts` 增 `applySynopsis`；`ProjectSettingsPage` 底部接入 AI 配置与备份面板；`OutlinePage`/`CharacterDetailPage`/`RelationshipGraphPage` 各增 AI 入口；`ProjectWorkspace` 挂 `useAutoBackup`。
+- Sprint 7 验收：项目设置页可保存 AI 配置并测试连接；大纲页 AI 生成五句话可编辑写入；人物详情页 AI 生成小传写入背景故事；关系图 AI 建议可勾选采纳（去重/归一）；备份面板可选目录、立即备份、加密口令、从备份文件恢复为副本。
+
+### Sprint 6（历史）
 - 新增：`pages/project/ForeshadowingsPage.tsx`（US-601 伏笔 CRUD + 状态筛选 + 大纲埋设/回收计数展示）、`pages/project/IdeasPage.tsx`（US-901 文本速记：搜索/标签点击筛选/删除）、`utils/markdown.ts`（US-701 htmlToMarkdown + chaptersToMarkdown）。
 - 修改：`types/meta.ts` Foreshadowing 增 `expectedResolveEventId?`（普通字段免 DB 迁移）；`db/repositories.ts` 增 `deleteForeshadowingCascade`；`utils/timeline.ts` kind 扩展 foreshadow（buildTimelineItems 接受 foreshadowings，active+锚定事件者插入节点）；`TimelinePage` 增伏笔节点开关与 sky 系渲染；`WritingPage` 增「导出 Markdown」；`vite.config.ts` 接入 VitePWA（manifest + workbox precache 10 条目 1.2MB）；App.tsx 注册 foreshadowing/ideas 路由；ModulePlaceholderPage 简化为兜底。
 - 依赖：+vite-plugin-pwa（1.3.0，devDep）。

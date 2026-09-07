@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { AlertTriangle, ExternalLink, Focus, Maximize2, RotateCcw, Share2, Tag } from 'lucide-react'
+import { AlertTriangle, ExternalLink, Focus, Maximize2, RotateCcw, Share2, Sparkles, Tag } from 'lucide-react'
+import RelationshipSuggestModal from '@/components/ai/RelationshipSuggestModal'
 import cytoscape, { type Core, type ElementDefinition, type EventObject } from 'cytoscape'
 import { Badge, Button, EmptyState } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -36,11 +37,12 @@ export default function RelationshipGraphPage() {
   const cyRef = useRef<Core | null>(null)
   const [selection, setSelection] = useState<Selection>(null)
   const [showEdgeLabel, setShowEdgeLabel] = useState(false)
+  const [suggestOpen, setSuggestOpen] = useState(false) // US-804 AI 关系建议
   const [graphKey, setGraphKey] = useState(0)
   const [graphError, setGraphError] = useState<string | null>(null)
 
   const { items: characters, loaded: charsLoaded } = useProjectEntityList(characterRepo, projectId)
-  const { items: relationships, loaded: relsLoaded } = useProjectEntityList(relationshipRepo, projectId)
+  const { items: relationships, loaded: relsLoaded, refresh: refreshRels } = useProjectEntityList(relationshipRepo, projectId)
 
   const charById = useCallback(
     (id: string) => characters.find((c) => c.id === id),
@@ -169,6 +171,9 @@ export default function RelationshipGraphPage() {
           </p>
         </div>
         <div className="flex items-center gap-1.5">
+          <Button variant="subtle" size="sm" onClick={() => setSuggestOpen(true)}>
+            <Sparkles className="size-4" /> AI 关系建议
+          </Button>
           <Button
             variant="ghost"
             size="sm"
@@ -185,6 +190,20 @@ export default function RelationshipGraphPage() {
           </Button>
         </div>
       </div>
+
+      {suggestOpen && projectId && (
+        <RelationshipSuggestModal
+          projectId={projectId}
+          characters={characters}
+          relationships={relationships}
+          onClose={() => setSuggestOpen(false)}
+          onApplied={() => {
+            setSuggestOpen(false)
+            setGraphKey((k) => k + 1)
+            void refreshRels()
+          }}
+        />
+      )}
 
       {loading ? (
         <div className="h-[560px] animate-pulse rounded-2xl bg-stone-200/60" />

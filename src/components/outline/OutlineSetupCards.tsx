@@ -188,16 +188,27 @@ function SynopsisLine({ node, index, onSaved }: { node: OutlineNode; index: numb
 }
 
 /** 五句话梗概卡片：对应三幕式结构，五句分别输入保存（每句独立 synopsis_item 节点） */
-export function LoglineCard({ items }: { items: OutlineNode[] }) {
+export function LoglineCard({ items, onGenerateAI }: { items: OutlineNode[]; onGenerateAI?: () => void }) {
   const sorted = [...items].sort((a, b) => a.order - b.order)
   return (
     <div className="rounded-2xl border border-sky-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sky-700">
-        <Quote className="size-4" /> 五句话梗概
-        <span className="font-normal normal-case tracking-normal text-stone-400">
-          （开端 · 发展 · 高潮 · 转折 · 结局 · US-202）
-        </span>
-      </h2>
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-sky-700">
+          <Quote className="size-4" /> 五句话梗概
+          <span className="font-normal normal-case tracking-normal text-stone-400">
+            （开端 · 发展 · 高潮 · 转折 · 结局 · US-202）
+          </span>
+        </h2>
+        {onGenerateAI && (
+          <button
+            type="button"
+            onClick={onGenerateAI}
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-sky-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-sky-800"
+          >
+            <Sparkles className="size-3.5" /> AI 生成
+          </button>
+        )}
+      </div>
       <p className="mb-3 text-xs text-stone-400">
         与「{SYNOPSIS_PARTS.join(' · ')}」对应，输入后自动保存；后续可用它生成分幕。
       </p>

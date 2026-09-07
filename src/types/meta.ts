@@ -85,3 +85,25 @@ export interface BackupMetadata {
   /** 备份中包含的记录条数 */
   recordCount: number
 }
+
+/**
+ * 自动备份设置（Sprint 7 US-702）：单条记录（id='auto'）。
+ * handle 为 File System Access API 的目录句柄，IndexedDB 可结构化克隆持久化；
+ * 重新打开页面后需 queryPermission/requestPermission 恢复写权限。
+ */
+export interface BackupSettings {
+  id: string
+  enabled: boolean
+  /** 备份目录名（仅用于展示） */
+  dirName?: string
+  /** 目录句柄（FileSystemDirectoryHandle，类型由使用方断言） */
+  handle?: unknown
+  /** 自动备份间隔（分钟） */
+  intervalMinutes: number
+  /** 是否使用口令加密备份文件 */
+  encrypted: boolean
+  lastBackupAt?: string
+  /** 最近一次备份结果文案 */
+  lastResult?: string
+  updatedAt: string
+}

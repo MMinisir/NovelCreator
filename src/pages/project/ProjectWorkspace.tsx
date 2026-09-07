@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import { useAutoBackup } from '@/hooks/useAutoBackup'
 import { EmptyState } from '@/components/ui'
 
 const MODULES = [
@@ -47,6 +48,9 @@ export default function ProjectWorkspace() {
   useEffect(() => {
     void loadProjects()
   }, [loadProjects])
+
+  // Sprint 7 US-702：项目打开期间按间隔自动备份
+  useAutoBackup(projectId, project?.name)
 
   if (!project) {
     return (

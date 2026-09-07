@@ -4,6 +4,7 @@
  */
 import { db } from './database'
 import type { BaseEntity, EntityStoreName } from '@/types'
+import type { BackupSettings } from '@/types/meta'
 import type { ChapterVersion } from '@/types/chapter'
 import { isoNow } from '@/utils/common'
 
@@ -267,6 +268,29 @@ export async function deleteChapterCascade(chapterId: string): Promise<void> {
     await db.scenes.where('chapterId').equals(chapterId).delete()
     await db.chapters.delete(chapterId)
   })
+}
+
+/** 自动备份设置（Sprint 7 US-702）：单条记录 id='auto' */
+export const BACKUP_SETTINGS_ID = 'auto'
+
+export async function loadBackupSettings(): Promise<BackupSettings | null> {
+  return (await db.backup_settings.get(BACKUP_SETTINGS_ID)) ?? null
+}
+
+/** 合并保存备份设置（缺失字段取默认值；handle/加密口令不落明文密码） */
+export async function saveBackupSettings(patch: Partial<BackupSettings>): Promise<BackupSettings> {
+  const current = await loadBackupSettings()
+  const now = new Date().toISOString()
+  const base: BackupSettings = current ?? {
+    id: BACKUP_SETTINGS_ID,
+    enabled: false,
+    intervalMinutes: 60,
+    encrypted: false,
+    updatedAt: now,
+  }
+  const next: BackupSettings = { ...base, ...patch, id: BACKUP_SETTINGS_ID, updatedAt: now }
+  await db.backup_settings.put(next)
+  return next
 }
 
 /** 删除伏笔：先解除全部大纲节点的埋设/回收引用再删除（Sprint 6 US-601 伏笔管理页） */

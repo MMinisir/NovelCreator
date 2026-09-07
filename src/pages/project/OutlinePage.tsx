@@ -9,6 +9,8 @@ import type { Foreshadowing } from '@/types/meta'
 import type { OutlineNode, OutlineNodeType } from '@/types/outline'
 import { StoryCoreCard, LoglineCard } from '@/components/outline/OutlineSetupCards'
 import { OutlineNodeEditor } from '@/components/outline/OutlineNodeEditor'
+import SynopsisGeneratorModal from '@/components/ai/SynopsisGeneratorModal'
+import { useProjectStore } from '@/stores/projectStore'
 
 const TYPE_ICON: Record<string, typeof FileText> = {
   act: BookOpen,
@@ -29,6 +31,8 @@ export default function OutlinePage() {
   const navigate = useNavigate()
   const { items: nodes, loaded, refresh } = useProjectEntityList(outlineRepo, projectId)
   const { items: characters } = useProjectEntityList(characterRepo, projectId)
+  const project = useProjectStore((s) => s.currentProject())
+  const [synopsisAIOpen, setSynopsisAIOpen] = useState(false) // US-802 AI 生成五句话
   const { items: events } = useProjectEntityList(eventRepo, projectId)
   const { items: locations } = useProjectEntityList(locationRepo, projectId)
   const { items: chapters } = useProjectEntityList(chapterRepo, projectId)
@@ -177,7 +181,18 @@ export default function OutlinePage() {
           {/* 左列：引导卡 + 结构树 */}
           <div className="min-w-0 space-y-5">
             <StoryCoreCard node={storyCore} onSaved={() => void refresh()} />
-            <LoglineCard items={synopsisItems} />
+            <LoglineCard items={synopsisItems} onGenerateAI={() => setSynopsisAIOpen(true)} />
+            {synopsisAIOpen && project && (
+              <SynopsisGeneratorModal
+                project={project}
+                characters={characters}
+                onClose={() => setSynopsisAIOpen(false)}
+                onApplied={() => {
+                  setSynopsisAIOpen(false)
+                  void refresh()
+                }}
+              />
+            )}
 
             <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
               <div className="mb-3 flex items-center justify-between">

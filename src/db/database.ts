@@ -1,7 +1,7 @@
 import Dexie, { type EntityTable } from 'dexie'
 import type { Character, CharacterState, ArcStage } from '@/types/character'
 import type { Chapter, ChapterVersion, Scene } from '@/types/chapter'
-import type { Foreshadowing, IdeaFragment, Comment, PromptTemplate, BackupMetadata } from '@/types/meta'
+import type { Foreshadowing, IdeaFragment, Comment, PromptTemplate, BackupMetadata, BackupSettings } from '@/types/meta'
 import type { OutlineNode } from '@/types/outline'
 import type { Project } from '@/types/project'
 import type { Relationship, Location, StoryEvent } from '@/types/world'
@@ -29,6 +29,7 @@ class NovelDatabase extends Dexie {
   comments!: EntityTable<Comment, 'id'>
   prompt_templates!: EntityTable<PromptTemplate, 'id'>
   backup_metadata!: EntityTable<BackupMetadata, 'id'>
+  backup_settings!: EntityTable<BackupSettings, 'id'>
 
   constructor() {
     super(DB_NAME)
@@ -50,6 +51,10 @@ class NovelDatabase extends Dexie {
       comments: 'id, projectId, targetType, targetId, status',
       prompt_templates: 'id, projectId, category',
       backup_metadata: 'id, exportedAt',
+    })
+    // Sprint 7 US-702：自动备份设置（单条 id='auto'）
+    this.version(2).stores({
+      backup_settings: 'id',
     })
     // 数据迁移策略：后续结构变更在此追加 version(n).upgrade(...) 迁移函数
   }

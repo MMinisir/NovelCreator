@@ -186,6 +186,25 @@ export async function createChapterDraftFromOutline(projectId: string, node: Out
   return chapter
 }
 
+/**
+ * 写入五句话梗概（Sprint 7 US-802）：
+ * 幂等确保大纲种子结构后，按「开端/发展/高潮/转折/结局」顺序更新各 synopsis_item 内容。
+ */
+export async function applySynopsis(projectId: string, lines: string[]): Promise<void> {
+  await ensureOutlineSeed(projectId)
+  const nodes = await outlineRepo.byProject(projectId)
+  const logline = nodes.find((n) => n.type === 'logline')
+  if (!logline) return
+  const items = nodes
+    .filter((n) => n.type === 'synopsis_item' && n.parentId === logline.id)
+    .sort((a, b) => a.order - b.order)
+  for (let i = 0; i < SYNOPSIS_PARTS.length; i += 1) {
+    const item = items[i]
+    if (!item) continue
+    await outlineRepo.update(item.id, { content: lines[i] ?? '' })
+  }
+}
+
 /** 简易 HTML → 纯文本（大纲节点核心剧情摘要用） */
 export function stripHtml(html: string): string {
   return html
