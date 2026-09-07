@@ -6,6 +6,7 @@ import {
   CalendarClock,
   Clock,
   Flag,
+  HeartPulse,
   LayoutDashboard,
   Lightbulb,
   ListTree,
@@ -32,6 +33,7 @@ const MODULES = [
   { path: 'writing', label: '写作区', icon: PenLine },
   { path: 'ideas', label: '灵感碎片', icon: Lightbulb },
   { path: 'consistency', label: '一致性检查', icon: ShieldCheck },
+  { path: 'health', label: '体检报告', icon: HeartPulse },
   { path: 'settings', label: '项目设置', icon: Settings },
 ]
 

@@ -266,6 +266,8 @@ export async function deleteChapterCascade(chapterId: string): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
     await db.chapter_versions.where('chapterId').equals(chapterId).delete()
     await db.scenes.where('chapterId').equals(chapterId).delete()
+    // Sprint 10 US-1001：章节批注（comments.targetId = chapterId）
+    await db.comments.where('targetId').equals(chapterId).delete()
     await db.chapters.delete(chapterId)
   })
 }

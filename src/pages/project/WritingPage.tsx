@@ -1,8 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Columns2, Download, FileText, History, PenLine, Plus, Sparkles, Target, Trash2 } from 'lucide-react'
+import {
+  CheckCircle2,
+  Columns2,
+  Download,
+  FileText,
+  FileDown,
+  History,
+  MessageSquare,
+  MessageSquarePlus,
+  Printer,
+  PenLine,
+  Plus,
+  Sparkles,
+  Target,
+  Trash2,
+} from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, cn } from '@/components/ui'
-import { characterRepo, chapterRepo, deleteChapterCascade, eventRepo, foreshadowingRepo, locationRepo, outlineRepo } from '@/db/repositories'
+import { characterRepo, chapterRepo, commentRepo, deleteChapterCascade, eventRepo, foreshadowingRepo, locationRepo, outlineRepo } from '@/db/repositories'
+import { filterChapterComments } from '@/services/comments'
+import { chaptersToPrintHtml, exportChaptersDocx, printHtml } from '@/services/exportDoc'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
 import { createEntity, downloadTextFile } from '@/utils/common'
@@ -10,6 +27,7 @@ import { chaptersToMarkdown } from '@/utils/markdown'
 import ChapterVersionModal from '@/components/writing/ChapterVersionModal'
 import ReferencePanel from '@/components/writing/ReferencePanel'
 import PolishModal from '@/components/ai/PolishModal'
+import CommentModal from '@/components/writing/CommentModal'
 import { autoSnapshot } from '@/services/chapterVersions'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
@@ -41,6 +59,7 @@ export default function WritingPage() {
   const { items: foreshadowings } = useProjectEntityList(foreshadowingRepo, projectId)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [showReference, setShowReference] = useState(false) // US-501b 分屏参考面板
+  const [exporting, setExporting] = useState<'docx' | null>(null) // US-701 导出中状态
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<Chapter | null>(null)
 
@@ -92,6 +111,27 @@ export default function WritingPage() {
     downloadTextFile(`${project?.name ?? '未命名作品'}-正文-${date}.md`, md, 'text/markdown')
   }
 
+  /** US-701 扩展：导出 Word（.docx） */
+  async function handleExportDocx() {
+    setExporting('docx')
+    try {
+      await exportChaptersDocx(project?.name ?? '', sorted)
+    } catch (err) {
+      window.alert(`导出 Word 失败：${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setExporting(null)
+    }
+  }
+
+  /** US-701 扩展：通过打印对话框导出 PDF */
+  function handleExportPdf() {
+    try {
+      printHtml(chaptersToPrintHtml(project?.name ?? '', sorted))
+    } catch (err) {
+      window.alert(`导出 PDF 失败：${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -116,6 +156,23 @@ export default function WritingPage() {
             title="将全部章节导出为 Markdown 文件"
           >
             <Download className="size-4" /> 导出 Markdown
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => void handleExportDocx()}
+            disabled={!loaded || sorted.length === 0}
+            loading={exporting === 'docx'}
+            title="将全部章节导出为 Word 文档（.docx）"
+          >
+            <FileDown className="size-4" /> 导出 Word
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handleExportPdf}
+            disabled={!loaded || sorted.length === 0}
+            title="打开打印对话框，选择「另存为 PDF」即可导出"
+          >
+            <Printer className="size-4" /> 导出 PDF
           </Button>
           <Button variant="primary" onClick={() => setCreating(true)} disabled={!projectId}>
             <Plus className="size-4" /> 新建章节
@@ -327,8 +384,15 @@ function ChapterEditor({
   const [versionOpen, setVersionOpen] = useState(false) // US-504 版本历史
   const [selection, setSelection] = useState<EditorSelection | null>(null) // US-806 润色选区
   const [polishOpen, setPolishOpen] = useState(false)
+  const [commentOpen, setCommentOpen] = useState(false) // US-1001 批注面板
   const editorApiRef = useRef<RichTextEditorAPIRef>({ current: null })
   const wordCount = useMemo(() => countWords(html), [html])
+  // US-1001：本章未解决批注数（用于按钮角标）
+  const { items: comments } = useProjectEntityList(commentRepo, chapter.projectId)
+  const openCommentCount = useMemo(
+    () => filterChapterComments(comments, chapter.id).filter((c) => c.status === 'open').length,
+    [comments, chapter.id],
+  )
 
   const htmlRef = useRef(html)
   htmlRef.current = html
@@ -423,6 +487,15 @@ function ChapterEditor({
               <option key={s} value={s}>{CHAPTER_STATUS_LABELS[s]}</option>
             ))}
           </Select>
+          <Button
+            size="sm"
+            variant={openCommentCount > 0 ? 'secondary' : 'ghost'}
+            onClick={() => setCommentOpen(true)}
+            title="批注（US-1001）"
+          >
+            <MessageSquare className="size-3.5" />
+            {openCommentCount > 0 && <span className="text-xs">{openCommentCount}</span>}
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setVersionOpen(true)} title="版本历史（US-504）">
             <History className="size-3.5" />
           </Button>
@@ -451,6 +524,9 @@ function ChapterEditor({
       {selection && (
         <div className="mb-2 flex items-center justify-end gap-2">
           <span className="text-xs text-stone-400">已选中 {selection.text.length} 字</span>
+          <Button size="sm" variant="ghost" onClick={() => setCommentOpen(true)} title="为选中文本添加批注（US-1001）">
+            <MessageSquarePlus className="size-3.5" /> 添加批注
+          </Button>
           <Button size="sm" variant="secondary" onClick={() => setPolishOpen(true)}>
             <Sparkles className="size-3.5" /> AI 润色选中
           </Button>
@@ -478,6 +554,15 @@ function ChapterEditor({
             setVersionOpen(false)
             onChanged()
           }}
+        />
+      )}
+      {commentOpen && (
+        <CommentModal
+          projectId={chapter.projectId}
+          chapterId={chapter.id}
+          chapterTitle={title || '未命名章节'}
+          selectedText={selection?.text}
+          onClose={() => setCommentOpen(false)}
         />
       )}
       {polishOpen && selection && (
