@@ -12,8 +12,10 @@ import {
   type CharacterCardDraft,
 } from '@/services/ai/tasks'
 import { buildCharacterCardPrompt, withSystem } from '@/services/ai/prompts'
+import { customContentById } from '@/services/ai/templates'
 import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
+import PromptTemplatePicker from './PromptTemplatePicker'
 import { createEntity } from '@/utils/common'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character } from '@/types'
 
@@ -45,6 +47,7 @@ export default function CharacterCardModal({
   const [saveError, setSaveError] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<CharacterCardDraft>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -69,6 +72,7 @@ export default function CharacterCardModal({
             { prompt, extra, genre, worldContext: projectContext, existingNames, projectId },
             loadAIConfig(),
             signal,
+            customContentById(tplId),
           ),
         )
     if (data) setDraft(data)
@@ -172,6 +176,7 @@ export default function CharacterCardModal({
       }
     >
       <div className="space-y-4">
+        <PromptTemplatePicker kind="characterCard" value={tplId} onChange={setTplId} />
         <Field label="一句话设定" required hint="越具体越好：身份 + 处境 + 特质，如“被逐出师门、靠赏金维生的落魄剑客”">
           <Textarea
             rows={3}
@@ -262,7 +267,10 @@ export default function CharacterCardModal({
         <PromptPreviewModal
           title="一句话角色卡"
           messages={withSystem(
-            buildCharacterCardPrompt({ prompt, extra, genre, worldContext: projectContext, existingNames }),
+            buildCharacterCardPrompt(
+              { prompt, extra, genre, worldContext: projectContext, existingNames },
+              customContentById(tplId),
+            ),
           )}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {

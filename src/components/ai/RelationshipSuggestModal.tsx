@@ -12,6 +12,8 @@ import {
 import { buildRelationshipPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
+import PromptTemplatePicker from './PromptTemplatePicker'
+import { customContentById } from '@/services/ai/templates'
 import { relationshipRepo } from '@/db/repositories'
 import { createEntity } from '@/utils/common'
 import type { Character, Relationship } from '@/types'
@@ -39,6 +41,7 @@ export default function RelationshipSuggestModal({
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error, result, setResult, setError, run, cancel } = useAITask<RelationshipSuggestion[]>()
 
   /** 已存在关系对（无方向，按 id 排序归一） */
@@ -92,6 +95,7 @@ export default function RelationshipSuggestModal({
             { focusName: focus, extra, projectContext, max: count, projectId },
             loadAIConfig(),
             signal,
+            customContentById(tplId),
           ),
         )
     if (list) {
@@ -186,6 +190,7 @@ export default function RelationshipSuggestModal({
       }
     >
       <div className="space-y-4">
+        <PromptTemplatePicker kind="relationship" value={tplId} onChange={setTplId} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="围绕人物" hint="可选">
             <Select value={focus} onChange={(e) => setFocus(e.target.value)}>
@@ -249,7 +254,13 @@ export default function RelationshipSuggestModal({
       {previewOpen && (
         <PromptPreviewModal
           title="人物关系建议"
-          messages={withSystem(buildRelationshipPrompt(characters, { focusName: focus, extra, projectContext, max: count }))}
+          messages={withSystem(
+            buildRelationshipPrompt(
+              characters,
+              { focusName: focus, extra, projectContext, max: count },
+              customContentById(tplId),
+            ),
+          )}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {
             setPreviewOpen(false)

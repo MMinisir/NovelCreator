@@ -7,6 +7,8 @@ import { explainHealthReport, runCustomPrompt } from '@/services/ai/tasks'
 import { buildHealthExplainPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
 import PasteImportModal from '@/components/ai/PasteImportModal'
+import PromptTemplatePicker from '@/components/ai/PromptTemplatePicker'
+import { customContentById } from '@/services/ai/templates'
 import { Badge, Button, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -70,6 +72,7 @@ export default function HealthReportPage() {
     useAITask<string>()
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
 
   function refreshAll() {
     void Promise.all([r1(), r2(), r3(), r4(), r5(), r6(), r7(), r8()])
@@ -89,7 +92,7 @@ export default function HealthReportPage() {
       return
     }
     await run((signal) =>
-      explainHealthReport({ projectName: project?.name ?? '', report, projectId }, loadAIConfig(), signal),
+      explainHealthReport({ projectName: project?.name ?? '', report, projectId }, loadAIConfig(), signal, customContentById(tplId)),
     )
   }
 
@@ -120,6 +123,7 @@ export default function HealthReportPage() {
           <Button variant="secondary" onClick={refreshAll}>
             <RefreshCw className="size-4" /> 重新生成
           </Button>
+          <PromptTemplatePicker kind="health" value={tplId} onChange={setTplId} />
           <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成的解读文字直接展示">
             <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
@@ -227,7 +231,9 @@ export default function HealthReportPage() {
       {previewOpen && (
         <PromptPreviewModal
           title="体检报告解读"
-          messages={withSystem(buildHealthExplainPrompt({ projectName: project?.name ?? '', report }))}
+          messages={withSystem(
+            buildHealthExplainPrompt({ projectName: project?.name ?? '', report }, customContentById(tplId)),
+          )}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {
             setPreviewOpen(false)

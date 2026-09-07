@@ -47,6 +47,9 @@
 | `services/ai/log.ts` | **AI 请求日志**：`startRequestLog`/`finishRequestLog`（记录完整 messages、响应、错误、耗时、模型）、`listRequestLogs`/`deleteRequestLog`/`clearRequestLogs`/`summarizeLogs`；存 IndexedDB `ai_request_logs`（db version 3），不随项目导出，随项目删除清理 |
 | `components/ai/PromptPreviewModal.tsx` | 提示预览：展示 system（可折叠）+ user（可编辑）、复制提示、「用此提示生成」（编辑仅本次生效，走 `runCustomPrompt`） |
 | `components/ai/PasteImportModal.tsx` | **粘贴填充（AI 写回）**：把别处生成的内容粘贴导入，复用各任务解析管线填为可编辑结果；props：`title/description/placeholder/example`（示例可一键填入）+ `onImport(text) => Promise<string\|null>|string\|null`（返回 null 成功自动关闭，返回文案则在弹窗内展示）；「读取剪贴板」用 `navigator.clipboard.readText`（失败提示手动粘贴）；不走内置 AI、不写请求日志 |
+| `services/ai/templates.ts` | **提示词模板层**：系统提示 + 7 个任务 user 提示全部模板化（默认文本注册于 `DEFAULT_PROMPT_CONTENT`，键 `system/synopsis/characterBio/relationship/polish/consistency/health/characterCard`）；渲染规则 `{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（变量为空整块移除、之后压缩多余空行）、未提供占位符原样保留；`renderByKind(kind,vars)`/`renderCustom(content,vars)` 统一渲染；`usePromptStore`（Zustand 全局，AppLayout 挂载时 `load()`）持 overrides/customs，覆盖与自定义持久化 prompt_templates 表（**projectId='' 代表全局**；custom 行 id 前缀 `custom:`，category=作用任务）；`getEffectiveSystemPrompt()` 返回生效系统提示；`customContentById(id)` 供入口选中自定义模板 |
+| `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 7 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
+| `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `pages/project/AIHistoryPage.tsx` | AI 请求历史页（路由 `/projects/:id/ai-log`，侧栏「AI 请求」）：统计 + 列表 + 展开看完整提示/响应/错误、复制、删除、清空本项目 |
 | `components/ai/CharacterCardModal.tsx` | **一句话生成角色卡**：设定输入 → AI 产出结构化字段 → 表单逐项编辑 → `characterRepo.add` 创建人物并跳转详情（纯文本字段经 `textToHtmlParagraphs` 转富文本） |
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
@@ -132,7 +135,12 @@
 
 ## 8. 最近变更
 
-### 本轮（AI 粘贴填充写回）
+### 本轮（提示词管理页 + 提示模板渲染统一）
+- 新增 `services/ai/templates.ts`（模板注册/渲染/持久化）与全局页 `pages/PromptTemplatesPage.tsx`（路由 `/prompts`，顶栏「提示词管理」）：系统提示与 7 个任务提示均可在页面查看/覆盖/恢复默认，支持新增自定义模板（选作用任务），改动即时对所有项目生效。
+- `services/ai/prompts.ts` 重构为模板渲染（不改导出签名）：`buildXxxPrompt(input, template?)` 内部先算 vars 再走默认/覆盖/自定义模板；`SYSTEM_PROMPT` 常量保留为默认文案，`withSystem` 与 `runCustomPrompt` 的系统提示改取 `getEffectiveSystemPrompt()`（可被覆盖）；默认模板输出与历史逻辑等价 → 不改功能。
+- 模板语法：`{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（值为空整段不输出）、未知占位符保留原样（防误删导致生成缺数据）；7 个入口（梗概/小传/关系建议/润色/一致性/体检/角色卡）与 AI 历史自建请求均可选用自定义模板（入口出现「模板」下拉，无自定义时不显示）。
+
+### 上轮（AI 粘贴填充写回）
 - 新增：`components/ai/PasteImportModal.tsx`（通用粘贴导入弹窗）。
 - 7 个 AI 入口（梗概/小传/关系建议/润色/一致性深度检查/体检解读/角色卡）的按钮区新增「粘贴填充」（与「AI 生成」「提示预览」并列），粘贴别处生成的内容 → 复用各自解析管线填为可编辑结果后照常落库：梗概自动拆五句（parseSynopsis）、角色卡/关系建议/深度检查解析 JSON（parseCharacterCard/parseRelationshipSuggestions/parseDeepConsistencyIssues，错误留在弹窗内可改后重试）、小传/润色/体检解读直接填充文本。
 - 关系建议/深度检查/角色卡弹窗提供「填入示例」演示解析效果；梗概支持「开端：…」前缀或顺序无前缀两种格式。

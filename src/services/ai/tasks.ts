@@ -4,6 +4,7 @@ import type { AIProviderConfig, ChatMessage } from './types'
 import {
   AI_KIND_LABELS,
   SYSTEM_PROMPT,
+  getEffectiveSystemPrompt,
   withSystem,
   buildSynopsisPrompt,
   buildBioPrompt,
@@ -97,7 +98,7 @@ export async function runCustomPrompt(
   return runPrompt(
     meta,
     [
-      { role: 'system', content: systemText || SYSTEM_PROMPT },
+      { role: 'system', content: systemText || getEffectiveSystemPrompt() },
       { role: 'user', content: userText },
     ],
     config,
@@ -112,10 +113,11 @@ export async function generateSynopsisText(
   input: SynopsisInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<string> {
   return runPrompt(
     { projectId: input.projectId, kind: 'synopsis', inputSummary: input.premise },
-    withSystem(buildSynopsisPrompt(input)),
+    withSystem(buildSynopsisPrompt(input, template)),
     config,
     signal,
   )
@@ -156,10 +158,11 @@ export async function generateCharacterBioText(
   input: BioInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<string> {
   return runPrompt(
     { projectId: character.projectId, kind: 'characterBio', inputSummary: character.name },
-    withSystem(buildBioPrompt(character, input)),
+    withSystem(buildBioPrompt(character, input, template)),
     config,
     signal,
   )
@@ -204,11 +207,12 @@ export async function generateRelationshipSuggestions(
   input: RelationshipInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<RelationshipSuggestion[]> {
   const pool = characters.slice(0, 30)
   const text = await runPrompt(
     { projectId: input.projectId ?? characters[0]?.projectId, kind: 'relationship', inputSummary: input.focusName },
-    withSystem(buildRelationshipPrompt(characters, input)),
+    withSystem(buildRelationshipPrompt(characters, input, template)),
     config,
     signal,
   )
@@ -262,10 +266,11 @@ export async function polishText(
   input: PolishInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<string> {
   return runPrompt(
     { projectId: input.projectId, kind: 'polish', inputSummary: input.context },
-    withSystem(buildPolishPrompt(input)),
+    withSystem(buildPolishPrompt(input, template)),
     config,
     signal,
   )
@@ -281,10 +286,11 @@ export async function runDeepConsistencyCheck(
   input: DeepCheckInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<ConsistencyIssue[]> {
   const text = await runPrompt(
     { projectId: input.project?.id, kind: 'consistency', inputSummary: input.project?.name },
-    withSystem(buildDeepConsistencyPrompt(input)),
+    withSystem(buildDeepConsistencyPrompt(input, template)),
     config,
     signal,
   )
@@ -343,10 +349,11 @@ export async function generateCharacterCard(
   input: CharacterCardInput,
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<CharacterCardDraft> {
   const text = await runPrompt(
     { projectId: input.projectId, kind: 'characterCard', inputSummary: input.prompt },
-    withSystem(buildCharacterCardPrompt(input)),
+    withSystem(buildCharacterCardPrompt(input, template)),
     config,
     signal,
   )
@@ -410,10 +417,11 @@ export async function explainHealthReport(
   input: { projectName: string; report: HealthReport; projectId?: string },
   config: AIProviderConfig | null,
   signal?: AbortSignal,
+  template?: string,
 ): Promise<string> {
   return runPrompt(
     { projectId: input.projectId, kind: 'health', inputSummary: input.projectName },
-    withSystem(buildHealthExplainPrompt(input)),
+    withSystem(buildHealthExplainPrompt(input, template)),
     config,
     signal,
   )

@@ -5,8 +5,10 @@ import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { generateCharacterBioText, runCustomPrompt, textToHtmlParagraphs } from '@/services/ai/tasks'
 import { buildBioPrompt, withSystem } from '@/services/ai/prompts'
+import { customContentById } from '@/services/ai/templates'
 import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
+import PromptTemplatePicker from './PromptTemplatePicker'
 import type { Character } from '@/types'
 
 /** 人物小传生成器（Sprint 7 US-803）：基于已有设定生成小传，可编辑后写入背景故事 */
@@ -26,6 +28,7 @@ export default function CharacterBioModal({
   const [text, setText] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -40,7 +43,7 @@ export default function CharacterBioModal({
           ),
         )
       : await run((signal) =>
-          generateCharacterBioText(character, { extra, words, projectContext }, loadAIConfig(), signal),
+          generateCharacterBioText(character, { extra, words, projectContext }, loadAIConfig(), signal, customContentById(tplId)),
         )
     if (!result) return
     setText(result.trim())
@@ -99,6 +102,7 @@ export default function CharacterBioModal({
       }
     >
       <div className="space-y-4">
+        <PromptTemplatePicker kind="characterBio" value={tplId} onChange={setTplId} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="期望字数">
             <Input type="number" min={100} max={2000} step={50} value={words} onChange={(e) => setWords(Number(e.target.value) || 400)} />
@@ -119,7 +123,7 @@ export default function CharacterBioModal({
       {previewOpen && (
         <PromptPreviewModal
           title="人物小传"
-          messages={withSystem(buildBioPrompt(character, { extra, words, projectContext }))}
+          messages={withSystem(buildBioPrompt(character, { extra, words, projectContext }, customContentById(tplId)))}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {
             setPreviewOpen(false)

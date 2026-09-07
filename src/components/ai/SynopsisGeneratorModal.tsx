@@ -5,8 +5,10 @@ import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { generateSynopsisText, parseSynopsis, runCustomPrompt } from '@/services/ai/tasks'
 import { buildSynopsisPrompt, withSystem } from '@/services/ai/prompts'
+import { customContentById } from '@/services/ai/templates'
 import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
+import PromptTemplatePicker from './PromptTemplatePicker'
 import { SYNOPSIS_PARTS, applySynopsis } from '@/services/outline'
 
 /** 示例文本：供「填入示例」演示解析效果 */
@@ -33,6 +35,7 @@ export default function SynopsisGeneratorModal({
   const [applying, setApplying] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   function buildContext(): string | undefined {
@@ -60,6 +63,7 @@ export default function SynopsisGeneratorModal({
             { genre, premise, characters: chars, style, projectContext: buildContext(), projectId: project.id },
             loadAIConfig(),
             signal,
+            customContentById(tplId),
           ),
         )
     if (text) {
@@ -134,6 +138,7 @@ export default function SynopsisGeneratorModal({
       }
     >
       <div className="space-y-4">
+        <PromptTemplatePicker kind="synopsis" value={tplId} onChange={setTplId} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="题材 / 类型">
             <Input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="如：都市异能" />
@@ -176,7 +181,10 @@ export default function SynopsisGeneratorModal({
         <PromptPreviewModal
           title="五句话梗概"
           messages={withSystem(
-            buildSynopsisPrompt({ genre, premise, characters: chars, style, projectContext: buildContext() }),
+            buildSynopsisPrompt(
+              { genre, premise, characters: chars, style, projectContext: buildContext() },
+              customContentById(tplId),
+            ),
           )}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {

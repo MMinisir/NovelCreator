@@ -7,6 +7,8 @@ import { parseDeepConsistencyIssues, runCustomPrompt, runDeepConsistencyCheck } 
 import { buildDeepConsistencyPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
 import PasteImportModal from '@/components/ai/PasteImportModal'
+import PromptTemplatePicker from '@/components/ai/PromptTemplatePicker'
+import { customContentById } from '@/services/ai/templates'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -49,6 +51,7 @@ export default function ConsistencyPage() {
   const [aiIssues, setAiIssues] = useState<ConsistencyIssue[]>([])
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<ConsistencyIssue[]>()
 
   const issues = useMemo(
@@ -88,7 +91,7 @@ export default function ConsistencyPage() {
             ),
           ),
         )
-      : await run((signal) => runDeepConsistencyCheck(deepInput, loadAIConfig(), signal))
+      : await run((signal) => runDeepConsistencyCheck(deepInput, loadAIConfig(), signal, customContentById(tplId)))
     if (data) setAiIssues(data)
   }
 
@@ -128,6 +131,7 @@ export default function ConsistencyPage() {
               停止
             </Button>
           )}
+          <PromptTemplatePicker kind="consistency" value={tplId} onChange={setTplId} />
           <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成好的问题清单直接填充">
             <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
@@ -203,7 +207,7 @@ export default function ConsistencyPage() {
       {previewOpen && (
         <PromptPreviewModal
           title="一致性深度检查"
-          messages={withSystem(buildDeepConsistencyPrompt(deepInput))}
+          messages={withSystem(buildDeepConsistencyPrompt(deepInput, customContentById(tplId)))}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {
             setPreviewOpen(false)

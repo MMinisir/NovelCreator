@@ -5,8 +5,10 @@ import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { polishText, runCustomPrompt } from '@/services/ai/tasks'
 import { buildPolishPrompt, withSystem } from '@/services/ai/prompts'
+import { customContentById } from '@/services/ai/templates'
 import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
+import PromptTemplatePicker from './PromptTemplatePicker'
 import { diffLines, diffSummary } from '@/utils/diff'
 
 /** AI 润色选中文本（Sprint 9 US-806）：原文只读展示 + 结果可编辑 + 行差异对比，可一键替换选区 */
@@ -32,6 +34,7 @@ export default function PolishModal({
   const [note, setNote] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
+  const [tplId, setTplId] = useState('')
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -45,7 +48,9 @@ export default function PolishModal({
             signal,
           ),
         )
-      : await run((signal) => polishText({ text: original, context, style, projectId }, loadAIConfig(), signal))
+      : await run((signal) =>
+          polishText({ text: original, context, style, projectId }, loadAIConfig(), signal, customContentById(tplId)),
+        )
     if (!result) return
     const trimmed = result.trim()
     setText(trimmed)
@@ -116,6 +121,7 @@ export default function PolishModal({
       }
     >
       <div className="space-y-4">
+        <PromptTemplatePicker kind="polish" value={tplId} onChange={setTplId} />
         <Field label="原文（选中片段）">
           <div className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg border border-stone-200 bg-stone-50 p-3 text-sm leading-relaxed text-stone-600">
             {original}
@@ -169,7 +175,7 @@ export default function PolishModal({
       {previewOpen && (
         <PromptPreviewModal
           title="润色选中文本"
-          messages={withSystem(buildPolishPrompt({ text: original, context, style }))}
+          messages={withSystem(buildPolishPrompt({ text: original, context, style }, customContentById(tplId)))}
           onClose={() => setPreviewOpen(false)}
           onGenerate={(userText, systemText) => {
             setPreviewOpen(false)
