@@ -21,13 +21,15 @@ export default function CharacterBioModal({
   const [extra, setExtra] = useState('')
   const [words, setWords] = useState(400)
   const [text, setText] = useState<string | null>(null)
-  const { loading, error, run, cancel } = useAITask<string>()
+  const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate() {
     const result = await run((signal) =>
       generateCharacterBioText(character, { extra, words, projectContext }, loadAIConfig(), signal),
     )
-    if (result) setText(result.trim())
+    if (!result) return
+    setText(result.trim())
+    if (!result.trim()) setError('AI 返回内容为空，可补充人物设定后重试')
   }
 
   return (

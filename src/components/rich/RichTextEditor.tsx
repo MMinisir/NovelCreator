@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -18,8 +19,9 @@ import { cn } from '@/components/ui'
 /**
  * TipTap 轻量富文本编辑器（执行案 Sprint 2：富文本采用 TipTap 轻量配置）
  * 值以 HTML 存储（与 Character.appearance/background/notes 等字段一致）。
- * 非受控：初始 content 由 value 注入，改动经 onChange 上报；
- * 外部数据变化时应通过 key 重建组件实例。
+ * 非受控：初始 content 由 value 注入，改动经 onChange 上报。
+ * 外部数据变化（AI 生成写入、版本回滚等）会在**编辑器未聚焦且内容不同**时同步进来，
+ * 聚焦中不同步，避免打断输入与光标跳动。
  */
 export function RichTextEditor({
   value,
@@ -47,6 +49,14 @@ export function RichTextEditor({
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
   })
+
+  // 外部值同步（Sprint 8：AI 写入/版本回滚后立即可见）
+  useEffect(() => {
+    if (!editor || value === undefined) return
+    if (editor.isDestroyed || editor.isFocused) return
+    if (editor.getHTML() === value) return
+    editor.commands.setContent(value || '', false)
+  }, [value, editor])
 
   return (
     <div className="overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:ring-2 focus-within:ring-violet-500/40 focus-within:border-violet-500">

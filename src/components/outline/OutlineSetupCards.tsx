@@ -159,6 +159,11 @@ function SynopsisLine({ node, index, onSaved }: { node: OutlineNode; index: numb
   const [value, setValue] = useState(node.content ?? '')
   const [saving, setSaving] = useState(false)
 
+  // 外部写入（如 AI 生成五句话 applySynopsis）后同步显示，避免本地状态停留在旧值
+  useEffect(() => {
+    setValue(node.content ?? '')
+  }, [node.id, node.content])
+
   async function save() {
     if (saving) return
     setSaving(true)

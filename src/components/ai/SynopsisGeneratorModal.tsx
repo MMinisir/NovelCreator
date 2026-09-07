@@ -25,7 +25,7 @@ export default function SynopsisGeneratorModal({
   const [style, setStyle] = useState('')
   const [lines, setLines] = useState<string[] | null>(null)
   const [applying, setApplying] = useState(false)
-  const { loading, error, run, cancel } = useAITask<string>()
+  const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate() {
     const context = characters.length
@@ -37,7 +37,11 @@ export default function SynopsisGeneratorModal({
     const text = await run((signal) =>
       generateSynopsisText({ genre, premise, characters: chars, style, projectContext: context }, loadAIConfig(), signal),
     )
-    if (text) setLines(parseSynopsis(text))
+    if (text) {
+      const parsed = parseSynopsis(text)
+      setLines(parsed)
+      if (parsed.every((l) => !l.trim())) setError('AI 返回内容为空或格式无法识别，可补充设定后重试（也可直接在下方手填）')
+    }
   }
 
   async function handleApply() {
