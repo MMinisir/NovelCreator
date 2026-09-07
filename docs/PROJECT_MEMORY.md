@@ -32,8 +32,10 @@
 | `utils/markdown.ts` | **Markdown 导出（US-701）**：`htmlToMarkdown`（TipTap HTML 受控子集→md，纯函数）+ `chaptersToMarkdown` 组装（头部元信息+按写作顺序章节） |
 | `utils/diff.ts` | **行级差异对比（US-504）**：自实现 LCS（公共前后缀裁剪 + >1200 行退化），`htmlToTextLines` / `diffLines` / `diffSummary` |
 | `services/chapterVersions.ts` | 章节版本历史（US-504）：`autoSnapshot`（内容变化且距上条自动版本 ≥2 分钟才写，自动版本保留 50 条）、`saveManualVersion`（带 label 里程碑）、`restoreVersion`（回滚前先把当前正文存为里程碑） |
-| `services/consistency.ts` | **一致性检查规则引擎（US-805 规则版）**：`runConsistencyChecks` 纯函数输出 Issue 列表（人物/关系/地点/事件/伏笔/章节/大纲 七类规则）+ `summarizeIssues` |
+| `services/consistency.ts` | **一致性检查规则引擎（US-805 规则版）**：`runConsistencyChecks` 纯函数输出 Issue 列表（人物/关系/地点/事件/伏笔/章节/大纲/综合 规则）+ `summarizeIssues`；Issue.category 含 `综合`（供 AI 语义结果归位） |
 | `components/writing/` | `ChapterVersionModal`（版本列表+差异+回滚）、`ReferencePanel`（US-501b/505 分屏参考：细纲/人物/地点/伏笔/关键事件） |
+| `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
+| `components/rich/RichTextEditor.tsx` | 新增选区 API：`EditorSelection`、`RichTextEditorAPI`（getSelection/replaceSelectionWithText）、`RichTextEditorAPIRef`（普通对象避开 React19 RefObject 只读 current）；`onSelectionUpdate` 上报选区、`onSelectionChange` 回调 |
 | `pages/ProjectListPage.tsx` | 首页项目列表 |
 | `pages/project/ProjectWorkspace.tsx` | 项目内布局 + 侧栏模块导航（设置 URL: `/projects/:id/xxx`） |
 | `pages/project/*Page.tsx` | Characters/Locations/Events/Outline/Writing/CharacterDetail/Overview/Settings/Timeline/Graph/**Foreshadowings**/Ideas/ModulePlaceholder（兜底） |
@@ -70,7 +72,7 @@
 | 6 | 伏笔管理（US-601/602）、导出 Markdown（US-701）、PWA 速记（US-901） | ✅（本轮） |
 | 7 | AI 功能开放（US-801~804）、自动备份（US-702/703） | ✅（本轮） |
 | 8 | 一致性/写作辅助/版本历史（US-501b,504,505,805） | ✅（本轮） |
-| 9 | AI 审稿与移动端（US-806,805-LLM,902,903） | 规划 |
+| 9 | AI 审稿与移动端（US-806,805-LLM,902,903） | ✅（本轮） |
 | 10 | 协作批注、DOCX/PDF 导出、体检报告（US-1001,701,新增） | 规划 |
 
 ## 6. 核心约定 / 待办（决策记录）
@@ -78,7 +80,9 @@
 - **US-205 大纲拖拽排序** → 待办（树组件行尾已预留）。
 - **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
 - **分屏参考（US-501b/505 已交付）**：写作区头部「分屏参考」开关，左面板展示本章关联设定——细纲概要、出场人物（含当前状态；细纲未标记时按正文提及人物名/别名兜底匹配）、地点（细纲 scene.locationId 或正文提及）、伏笔（本章埋设/回收 + 其它待回收提醒）、关键事件（细纲 keyEventIds）。
-- **一致性检查（US-805 规则引擎版已交付）**：路由 `/projects/:id/consistency`（侧栏「一致性检查」）。`services/consistency.ts` 纯函数规则：主角缺失、人物缺标签/欲望缺陷/当前状态、关系指向已删人物（error）、主要人物孤立、地点无描述、事件无时间/无参与者/引用不存在人物（error）、活跃伏笔无预期回收锚点（warn）、伏笔状态与大纲回收标记不一致（error）、活跃超 30 天、章节无正文/完成章字数不足目标 50%（warn）、大纲无分幕、细纲未展开正文。LLM 语义检查 Sprint 9 增强（页面顶部已注明）。
+- **一致性检查（US-805 规则引擎+AI 语义已交付）**：路由 `/projects/:id/consistency`（侧栏「一致性检查」）。`services/consistency.ts` 纯函数规则：主角缺失、人物缺标签/欲望缺陷/当前状态、关系指向已删人物（error）、主要人物孤立、地点无描述、事件无时间/无参与者/引用不存在人物（error）、活跃伏笔无预期回收锚点（warn）、伏笔状态与大纲回收标记不一致（error）、活跃超 30 天、章节无正文/完成章字数不足目标 50%（warn）、大纲无分幕、细纲未展开正文。页面「AI 深度检查」→ `runDeepConsistencyCheck`：把人物清单+正文片段+伏笔+规则结果发给 LLM 做语义推断（人物已死仍出场/时间矛盾等），结果带紫色「AI 语义」徽标并入报告（id 前缀 `ai:`，不可跳转；category 白名单+「综合」兜底）。
+- **AI 润色（US-806 已交付）**：写作区选中正文出现「AI 润色选中」→ PolishModal：原文只读、可选润色方向、结果可编辑、「与原文对比」行 diff（+绿/-红）、「替换选中」用 `editor.commands.insertContentAt` 回写（多段纯文本自动转 `<p>`），替换触发自动保存。选区失效时（内容已变）提示重新选中。未配置 AI 服务时按钮点击会报中文错误。
+- **移动端（US-902/903 已交付基础版）**：ProjectWorkspace 在 `md` 以下把左侧栏换成内容顶部横向滚动 tab（全部模块可达）；查看类页面网格本就是 `grid-cols-1 sm/lg/xl` 响应式（人物/大纲/时间线可直接查看）；写作区窄屏布局改为列向堆叠（章节列表在上、编辑器在下），正文区 `overflow-wrap:anywhere` 防横向溢出，编辑器最小高度移动端降到 42vh（避免键盘遮挡）。时间线行为固定行高容器、内容 chips wrap，无整页横向滚动。
 - **时间线（Sprint 5+6 已交付）**：路由 `/projects/:id/timeline`（TimelinePage）。全局=全部事件；顶部 Select 选人=角色时间线（该人物事件+`CharacterState` 状态变化合并）。筛选=人物/地点/类型 chips + **「伏笔节点」开关（US-602，sky 色节点）**。排序=compareFlexibleTime 类别段内序；**模糊/相对事件行右侧 ▲▼ 在同类段内移动**（写 `time.sortOrder`，首次移动自动归一 0..n-1）。虚拟滚动=react-window v2 `List`。事件编辑仍在事件页。
 - **伏笔管理（Sprint 6 已交付）**：路由 `/projects/:id/foreshadowing`（ForeshadowingsPage）。列表状态筛选（全部/活跃/已回收/已废弃）+ 优先级/预期回收事件/相关人物展示；新建/编辑 Modal（描述必填；**预期回收事件**锚到事件 → 时间线节点）；删除走 `deleteForeshadowingCascade`（自动解除全部大纲节点 planted/resolved 引用）。大纲节点侧（OutlineNodeEditor）埋设/回收闭环仍可用。
 - **Markdown 导出（US-701）**：写作页头部「导出 Markdown」→ `chaptersToMarkdown` 组装（# 作品名 + 元信息 + 按顺序各章 `## 标题` + 状态/字数 + htmlToMarkdown 正文）。htmlToMarkdown 支持子集：h1-6/p/strong/em/code/s/del/a/br/img/blockquote/ul/ol(嵌套)/hr/pre。DOCX/PDF 留 Sprint 10。
@@ -104,7 +108,12 @@
 
 ## 8. 最近变更
 
-### Sprint 8（本轮）
+### Sprint 9（本轮）
+- 新增：`components/ai/PolishModal.tsx`；`services/ai/tasks.ts` 增 `polishText`（US-806）与 `runDeepConsistencyCheck`/`parseDeepConsistencyIssues`（US-805 LLM）；`RichTextEditor` 增选区 API 与上报。
+- 修改：`WritingPage` 接入「AI 润色选中」（选中文本后按钮出现，替换后自动保存）；`ConsistencyPage` 增「AI 深度检查」（紫色 AI 徽标问题并入报告列表，可停止）；`ProjectWorkspace` 移动端横向 tab 导航（md 以下）；`WritingPage` 写作布局窄屏列向堆叠（US-903）；`index.css` 正文长文本自动换行；编辑器 `minHeight` 移动端降低。
+- Sprint 9 验收：选中正文可 AI 润色并对比/替换；一致性页可跑 AI 语义深度检查；手机可经横向导航查看人物/大纲/时间线并在写作区编辑。
+
+### Sprint 8（历史）
 - 新增：`utils/diff.ts`、`services/chapterVersions.ts`、`services/consistency.ts`、`components/writing/{ChapterVersionModal,ReferencePanel}.tsx`、`pages/project/ConsistencyPage.tsx`。
 - 修改：`WritingPage` 接入自动快照（flush 后）+「版本历史」按钮 +「分屏参考」开关与左参考面板；`App.tsx` 注册 `consistency` 路由；`ProjectWorkspace` 侧栏加「一致性检查」。
 - Sprint 8 验收：写作时可开关分屏参考看到本章关联人物/地点/伏笔；停笔自动保存产生版本，版本弹窗可看行差异并回滚；一致性检查页按错误/警告/提示统计并列出问题，可一键跳转处理。

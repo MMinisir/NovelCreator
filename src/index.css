@@ -31,6 +31,11 @@ body {
 }
 
 /* TipTap 编辑器内容样式 */
+.prose-editor {
+  /* 移动端查看/编辑：长文本（URL 等）自动换行，避免横向溢出（Sprint 9 US-903） */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .prose-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   color: rgb(168 162 158);

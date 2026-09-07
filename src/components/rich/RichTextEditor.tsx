@@ -16,6 +16,36 @@ import {
 } from 'lucide-react'
 import { cn } from '@/components/ui'
 
+/** 有效选区：非空且含可见文本 */
+export interface EditorSelection {
+  from: number
+  to: number
+  text: string
+}
+
+/** 编辑器命令 API（供写作页的 AI 润色等外部功能调用） */
+export interface RichTextEditorAPI {
+  /** 当前有效选区，无选区返回 null */
+  getSelection: () => EditorSelection | null
+  /** 用纯文本（多段自动转段落）替换当前选区；无有效选区返回 false */
+  replaceSelectionWithText: (text: string) => boolean
+}
+
+/** API 载体（普通对象引用，规避 React 19 RefObject.current 只读限制） */
+export interface RichTextEditorAPIRef {
+  current: RichTextEditorAPI | null
+}
+
+/** 纯文本 → 简单 HTML 段落（供替换选区使用，避免富文本工具依赖 AI 层） */
+function textToHtml(text: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const parts = text
+    .split(/\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  return parts.length ? parts.map((p) => `<p>${esc(p)}</p>`).join('') : '<p></p>'
+}
+
 /**
  * TipTap 轻量富文本编辑器（执行案 Sprint 2：富文本采用 TipTap 轻量配置）
  * 值以 HTML 存储（与 Character.appearance/background/notes 等字段一致）。
@@ -28,11 +58,17 @@ export function RichTextEditor({
   onChange,
   placeholder,
   minHeight = 'min-h-24',
+  apiRef,
+  onSelectionChange,
 }: {
   value?: string
   onChange: (html: string) => void
   placeholder?: string
   minHeight?: string
+  /** 暴露选区读取/替换命令（写作页 AI 润色等） */
+  apiRef?: RichTextEditorAPIRef
+  /** 选区变化上报（from===to 或无文本时报 null） */
+  onSelectionChange?: (sel: EditorSelection | null) => void
 }) {
   const editor = useEditor({
     extensions: [
@@ -48,6 +84,12 @@ export function RichTextEditor({
       },
     },
     onUpdate: ({ editor: e }) => onChange(e.getHTML()),
+    onSelectionUpdate: ({ editor: e }) => {
+      if (!onSelectionChange) return
+      const { from, to } = e.state.selection
+      const text = e.state.doc.textBetween(from, to, ' ')
+      onSelectionChange(from === to || !text.trim() ? null : { from, to, text })
+    },
   })
 
   // 外部值同步（Sprint 8：AI 写入/版本回滚后立即可见）
@@ -57,6 +99,30 @@ export function RichTextEditor({
     if (editor.getHTML() === value) return
     editor.commands.setContent(value || '', false)
   }, [value, editor])
+
+  // 暴露选区/替换 API
+  useEffect(() => {
+    if (!apiRef || !editor) return
+    const readSelection = (): EditorSelection | null => {
+      const { from, to } = editor.state.selection
+      const text = editor.state.doc.textBetween(from, to, ' ')
+      return from === to || !text.trim() ? null : { from, to, text }
+    }
+    apiRef.current = {
+      getSelection: readSelection,
+      replaceSelectionWithText: (t: string) => {
+        const sel = readSelection()
+        if (!sel) return false
+        editor.chain().focus().insertContentAt({ from: sel.from, to: sel.to }, textToHtml(t), {
+          updateSelection: true,
+        }).run()
+        return true
+      },
+    }
+    return () => {
+      if (apiRef.current) apiRef.current = null
+    }
+  }, [editor, apiRef])
 
   return (
     <div className="overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:ring-2 focus-within:ring-violet-500/40 focus-within:border-violet-500">

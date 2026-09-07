@@ -16,7 +16,7 @@ export type IssueLevel = 'error' | 'warn' | 'info'
 export interface ConsistencyIssue {
   id: string
   level: IssueLevel
-  category: '人物' | '关系' | '地点' | '事件' | '伏笔' | '章节' | '大纲'
+  category: '人物' | '关系' | '地点' | '事件' | '伏笔' | '章节' | '大纲' | '综合'
   title: string
   detail: string
   /** 项目内相对跳转路径（如 `characters/<id>`） */

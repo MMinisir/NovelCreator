@@ -72,7 +72,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
-    <div className="mx-auto flex max-w-7xl gap-8 px-4 py-6 lg:px-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-4 lg:flex-row lg:gap-8 lg:px-6">
       <aside className="hidden w-52 shrink-0 md:block">
         <Link
           to="/projects"
@@ -102,6 +102,26 @@ export default function ProjectWorkspace() {
       </aside>
 
       <section className="min-w-0 flex-1">
+        {/* 移动端模块导航（Sprint 9 US-902：小屏隐藏左侧栏，改用横向 tab） */}
+        <nav className="-mx-4 mb-4 flex gap-1 overflow-x-auto px-4 pb-1 md:hidden">
+          {MODULES.map((m) => (
+            <NavLink
+              key={m.path || 'overview'}
+              to={m.path}
+              end={m.end}
+              className={({ isActive }) =>
+                `flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-violet-700 text-white'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
+                }`
+              }
+            >
+              <m.icon className="size-3.5" />
+              {m.label}
+            </NavLink>
+          ))}
+        </nav>
         <Outlet />
       </section>
     </div>

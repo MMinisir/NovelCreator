@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Columns2, Download, FileText, History, PenLine, Plus, Target, Trash2 } from 'lucide-react'
+import { CheckCircle2, Columns2, Download, FileText, History, PenLine, Plus, Sparkles, Target, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { characterRepo, chapterRepo, deleteChapterCascade, eventRepo, foreshadowingRepo, locationRepo, outlineRepo } from '@/db/repositories'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -9,12 +9,17 @@ import { createEntity, downloadTextFile } from '@/utils/common'
 import { chaptersToMarkdown } from '@/utils/markdown'
 import ChapterVersionModal from '@/components/writing/ChapterVersionModal'
 import ReferencePanel from '@/components/writing/ReferencePanel'
+import PolishModal from '@/components/ai/PolishModal'
 import { autoSnapshot } from '@/services/chapterVersions'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import { CHAPTER_STATUS_LABELS } from '@/types/chapter'
 import type { Project } from '@/types/project'
-import { RichTextEditor } from '@/components/rich/RichTextEditor'
+import {
+  RichTextEditor,
+  type EditorSelection,
+  type RichTextEditorAPIRef,
+} from '@/components/rich/RichTextEditor'
 
 const STATUS_BADGE: Record<ChapterStatus, 'slate' | 'amber' | 'green' | 'violet'> = {
   not_started: 'slate',
@@ -124,7 +129,7 @@ export default function WritingPage() {
           <div className="flex-1 animate-pulse rounded-2xl bg-stone-200/60" />
         </div>
       ) : (
-        <div className="flex items-start gap-5">
+        <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start">
           {/* 章节列表 */}
           <aside className="w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm lg:w-72">
             <div className="mb-2 flex items-center justify-between px-1">
@@ -320,6 +325,9 @@ function ChapterEditor({
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [versionOpen, setVersionOpen] = useState(false) // US-504 版本历史
+  const [selection, setSelection] = useState<EditorSelection | null>(null) // US-806 润色选区
+  const [polishOpen, setPolishOpen] = useState(false)
+  const editorApiRef = useRef<RichTextEditorAPIRef>({ current: null })
   const wordCount = useMemo(() => countWords(html), [html])
 
   const htmlRef = useRef(html)
@@ -440,14 +448,24 @@ function ChapterEditor({
         )}
       </div>
 
+      {selection && (
+        <div className="mb-2 flex items-center justify-end gap-2">
+          <span className="text-xs text-stone-400">已选中 {selection.text.length} 字</span>
+          <Button size="sm" variant="secondary" onClick={() => setPolishOpen(true)}>
+            <Sparkles className="size-3.5" /> AI 润色选中
+          </Button>
+        </div>
+      )}
       <RichTextEditor
         value={html}
         onChange={(h) => {
           setHtml(h)
           scheduleSave()
         }}
-        placeholder="此刻开始书写故事……（支持标题、加粗、列表、引用等）"
-        minHeight="min-h-[62vh]"
+        apiRef={editorApiRef.current}
+        onSelectionChange={setSelection}
+        placeholder="此刻开始书写故事……（支持标题、加粗、列表、引用等；选中文字可 AI 润色）"
+        minHeight="min-h-[42vh] md:min-h-[62vh]"
       />
       <p className="mt-2 text-right text-xs text-stone-300">停笔 1.5 秒后自动保存至浏览器本地</p>
 
@@ -459,6 +477,21 @@ function ChapterEditor({
             setHtml(content)
             setVersionOpen(false)
             onChanged()
+          }}
+        />
+      )}
+      {polishOpen && selection && (
+        <PolishModal
+          original={selection.text}
+          context={title || '未命名章节'}
+          onClose={() => setPolishOpen(false)}
+          onApply={(text) => {
+            const ok = editorApiRef.current.current?.replaceSelectionWithText(text) ?? false
+            if (ok) {
+              setSelection(null)
+              onChanged()
+            }
+            return ok
           }}
         />
       )}

@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { CheckCircle2, ExternalLink, RefreshCw, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, ExternalLink, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
+import { useAITask } from '@/hooks/useAITask'
+import { loadAIConfig } from '@/services/ai/config'
+import { runDeepConsistencyCheck } from '@/services/ai/tasks'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -40,6 +43,8 @@ export default function ConsistencyPage() {
   const { items: outlineNodes, refresh: refreshOutline } = useProjectEntityList(outlineRepo, projectId)
 
   const [filter, setFilter] = useState<'all' | IssueLevel>('all')
+  const [aiIssues, setAiIssues] = useState<ConsistencyIssue[]>([])
+  const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<ConsistencyIssue[]>()
 
   const issues = useMemo(
     () =>
@@ -56,7 +61,29 @@ export default function ConsistencyPage() {
     [characters, locations, events, chapters, foreshadowings, relationships, outlineNodes, project?.chapterDefaults.targetWords],
   )
   const stats = summarizeIssues(issues)
-  const filtered = filter === 'all' ? issues : issues.filter((i) => i.level === filter)
+  const merged = useMemo(() => [...aiIssues, ...issues], [aiIssues, issues])
+  const filtered = filter === 'all' ? merged : merged.filter((i) => i.level === filter)
+
+  /** AI 语义深度检查（US-805 LLM 增强）：与规则引擎互补，可返回空数组 */
+  async function handleDeep() {
+    const data = await run((signal) =>
+      runDeepConsistencyCheck(
+        {
+          project,
+          characters,
+          locations,
+          events,
+          chapters,
+          foreshadowings,
+          outlineNodes,
+          existingIssues: issues,
+        },
+        loadAIConfig(),
+        signal,
+      ),
+    )
+    if (data) setAiIssues(data)
+  }
 
   function refreshAll() {
     void Promise.all([
@@ -76,13 +103,30 @@ export default function ConsistencyPage() {
         <div>
           <h1 className="text-xl font-bold text-stone-900">一致性检查</h1>
           <p className="mt-0.5 text-sm text-stone-500">
-            {project?.name} · 规则引擎版（人物/关系/事件/伏笔/章节）· AI 语义检查将在 Sprint 9 接入
+            {project?.name} · 规则引擎 + 可选 AI 语义深度检查（需在项目设置中配置 AI 服务）
           </p>
         </div>
-        <Button variant="secondary" onClick={refreshAll}>
-          <RefreshCw className="size-4" /> 重新检查
-        </Button>
+        <div className="flex items-center gap-2">
+          {loading && (
+            <Button variant="ghost" onClick={cancel}>
+              停止
+            </Button>
+          )}
+          <Button variant="primary" loading={loading} onClick={() => void handleDeep()}>
+            <Sparkles className="size-4" /> AI 深度检查
+          </Button>
+          <Button variant="secondary" onClick={refreshAll}>
+            <RefreshCw className="size-4" /> 重新检查
+          </Button>
+        </div>
       </div>
+
+      {aiError && <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{aiError}</p>}
+      {aiIssues.length > 0 && (
+        <p className="mb-3 flex items-center gap-1.5 text-xs text-violet-700">
+          <Sparkles className="size-3.5" /> AI 语义检查发现 {aiIssues.length} 个潜在问题（列于规则结果上方）
+        </p>
+      )}
 
       {/* 统计 */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -113,18 +157,23 @@ export default function ConsistencyPage() {
         ))}
       </div>
 
-      {issues.length === 0 ? (
+      {issues.length === 0 && aiIssues.length === 0 ? (
         <EmptyState
           icon={<CheckCircle2 className="size-6" />}
           title="未发现一致性问题"
-          description="当前设定在人物、关系、事件、伏笔与章节维度均通过了规则检查。"
+          description="当前设定在人物、关系、事件、伏笔与章节维度均通过了规则检查；可点击「AI 深度检查」做语义层面的补充排查。"
         />
       ) : filtered.length === 0 ? (
         <EmptyState icon={<ShieldCheck className="size-6" />} title="该级别下没有问题" description="切换上方筛选查看其它级别。" />
       ) : (
         <ul className="space-y-2.5">
           {filtered.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} projectId={projectId ?? ''} />
+            <IssueRow
+              key={issue.id}
+              issue={issue}
+              projectId={projectId ?? ''}
+              source={issue.id.startsWith('ai:') ? 'ai' : undefined}
+            />
           ))}
         </ul>
       )}
@@ -149,12 +198,13 @@ function StatCard({ label, value, tone }: { label: string; value: number; tone: 
   )
 }
 
-function IssueRow({ issue, projectId }: { issue: ConsistencyIssue; projectId: string }) {
+function IssueRow({ issue, projectId, source }: { issue: ConsistencyIssue; projectId: string; source?: 'ai' }) {
   return (
     <li className="flex items-start gap-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Badge color={LEVEL_BADGE[issue.level]}>{LEVEL_LABEL[issue.level]}</Badge>
+          {source === 'ai' && <Badge color="violet">AI 语义</Badge>}
           <Badge color="slate">{issue.category}</Badge>
           <span className="font-medium text-stone-900">{issue.title}</span>
         </div>

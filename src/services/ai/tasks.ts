@@ -2,6 +2,7 @@ import { createAIProvider } from './openaiCompat'
 import { buildCharacterContextBrief, buildProjectContextBrief } from './contextBuilder'
 import type { AIProviderConfig, ChatMessage } from './types'
 import { SYNOPSIS_PARTS } from '@/services/outline'
+import type { ConsistencyIssue, IssueLevel } from '@/services/consistency'
 import type { Character, Location, Project, StoryEvent } from '@/types'
 
 /**
@@ -218,6 +219,129 @@ export function parseRelationshipSuggestions(text: string, characters: Character
       disabled: !sourceId || !targetId,
       note: !sourceId || !targetId ? '人物未匹配到（需先创建该人物）' : undefined,
     })
+  }
+  return out
+}
+
+/* ---------------- US-806 润色选中文本 ---------------- */
+
+export interface PolishInput {
+  /** 选中原文 */
+  text: string
+  /** 场景上下文（如章节名） */
+  context?: string
+  /** 润色方向要求（如“更口语化”“氛围更凝重”） */
+  style?: string
+}
+
+/** 润色小说片段：只输出润色后正文 */
+export async function polishText(
+  input: PolishInput,
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const lines = [
+    `请润色下面的小说片段。`,
+    `要求：保持原意、人物口吻、叙事视角与段落结构；表达更生动流畅、用词更精炼，避免重复与空话；不新增情节、不改变人称与时间线。`,
+    `直接输出润色后的正文，不要输出任何解释或前后缀文字。`,
+    ``,
+    `【待润色片段】`,
+    input.text.trim().slice(0, 3000),
+  ]
+  if (input.context?.trim()) lines.push(``, `【所在章节】${input.context.trim()}`)
+  if (input.style?.trim()) lines.push(``, `【润色方向】${input.style.trim()}`)
+  return runPrompt(config, [{ role: 'user', content: lines.join('\n') }], signal)
+}
+
+/* ---------------- US-805 一致性检查（LLM 语义增强） ---------------- */
+
+const AI_LEVELS: IssueLevel[] = ['error', 'warn', 'info']
+const AI_CATEGORIES = ['人物', '关系', '地点', '事件', '伏笔', '章节', '大纲', '综合'] as const
+
+export interface DeepCheckInput {
+  project?: Project | null
+  characters: Character[]
+  locations: Location[]
+  events: StoryEvent[]
+  chapters: Array<{ id: string; title: string; order: number; content: string; wordCount: number }>
+  foreshadowings: Array<{ id: string; description: string; status: string; createdAt: string }>
+  outlineNodes: Array<{ id: string; title?: string; type: string }>
+  /** 规则引擎已发现的问题（让 AI 聚焦语义层、避免重复） */
+  existingIssues: ConsistencyIssue[]
+}
+
+/** 深度一致性检查：LLM 语义推断（如“人物A在后续章节已死却再次出场”），与规则引擎互补 */
+export async function runDeepConsistencyCheck(
+  input: DeepCheckInput,
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+): Promise<ConsistencyIssue[]> {
+  const projectName = input.project?.name ?? '未命名项目'
+  const charLines = input.characters
+    .slice(0, 40)
+    .map(
+      (c, i) =>
+        `${i + 1}. ${c.name}${c.importance ? `（重要度：${c.importance}）` : ''}${c.aliases.length ? `，别名：${c.aliases.join('/')}` : ''}${
+          c.personalityTags.length ? `，性格：${c.personalityTags.join('、')}` : ''
+        }${c.currentState?.state ? `，当前状态：${c.currentState.state}` : ''}`,
+    )
+    .join('\n')
+  const chapterLines = [...input.chapters]
+    .sort((a, b) => a.order - b.order)
+    .slice(0, 8)
+    .map((c) => `【${c.title || `第 ${c.order + 1} 章 未命名`}】${c.content.slice(0, 500)}`)
+    .join('\n')
+  const fsLines = input.foreshadowings.map((f) => `- ${f.description.slice(0, 60)}（状态：${f.status}）`).join('\n')
+
+  const lines = [
+    `你是资深中文小说审稿编辑。请对《${projectName}》进行语义一致性检查（基于设定数据与正文片段做推断），`,
+    `找出需要作者留意的深层次矛盾或遗漏：如“人物已死/重伤却仍在后续出场”“时间线前后矛盾”“行为与人设不符”“地点空间矛盾”“伏笔埋设与回收矛盾”“章节间叙述断裂”等。`,
+    `只输出 JSON 数组（不要代码块、不要任何解释文字），每项格式：`,
+    `{"level":"error|warn|info","category":"人物|关系|地点|事件|伏笔|章节|大纲|综合","title":"一句话标题","detail":"说明矛盾所在与建议（80 字内）"}`,
+    `要求：不要重复规则引擎已列出的问题；若没有额外发现，返回空数组 []。`,
+    ``,
+    `【人物】`,
+    charLines || '（无人物）',
+    ``,
+    `【章节正文片段】`,
+    chapterLines || '（无正文）',
+    ``,
+    `【伏笔】`,
+    fsLines || '（无伏笔）',
+    ``,
+    `【设定规模】地点 ${input.locations.length} 个，事件 ${input.events.length} 个，细纲节点 ${input.outlineNodes.length} 个。`,
+    ``,
+    `【规则引擎已发现（勿重复）】`,
+    input.existingIssues.map((i) => `- [${i.level}] ${i.title}`).join('\n') || '（无）',
+  ]
+  const text = await runPrompt(config, [{ role: 'user', content: lines.join('\n') }], signal)
+  return parseDeepConsistencyIssues(text)
+}
+
+/** 解析 AI 深度检查输出（容忍 ```json 包裹），非法项丢弃 */
+export function parseDeepConsistencyIssues(text: string): ConsistencyIssue[] {
+  const json =
+    text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ??
+    text.slice(text.indexOf('['), text.lastIndexOf(']') + 1)
+  let arr: unknown
+  try {
+    arr = JSON.parse(json)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(arr)) return []
+  const out: ConsistencyIssue[] = []
+  for (const item of arr as Array<Record<string, unknown>>) {
+    const level = String(item.level ?? '').trim() as IssueLevel
+    if (!AI_LEVELS.includes(level)) continue
+    const cat = String(item.category ?? '').trim()
+    const category = (AI_CATEGORIES as readonly string[]).includes(cat)
+      ? (cat as ConsistencyIssue['category'])
+      : ('综合' as const)
+    const title = String(item.title ?? '').trim().slice(0, 60)
+    const detail = String(item.detail ?? '').trim().slice(0, 200)
+    if (!title && !detail) continue
+    out.push({ id: `ai:${out.length}`, level, category, title: title || detail.slice(0, 30), detail })
   }
   return out
 }
