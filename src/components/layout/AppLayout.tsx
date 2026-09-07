@@ -1,10 +1,28 @@
+import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { BookOpenText, Search } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import GlobalSearchModal from '@/components/search/GlobalSearchModal'
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
+const SHORTCUT = IS_MAC ? '⌘K' : 'Ctrl K'
 
 /** 全局布局：顶栏 + 主内容区（设计文档 §6.1 顶部工具栏） */
 export default function AppLayout() {
   const currentProject = useProjectStore((s) => s.currentProject())
+  const [searchOpen, setSearchOpen] = useState(false)
+
+  // 全局搜索快捷键：Cmd/Ctrl + K
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="flex min-h-full flex-col">
@@ -26,20 +44,32 @@ export default function AppLayout() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="relative hidden lg:block">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-stone-400" />
-              <input
-                placeholder="全局搜索（开发中）"
-                disabled
-                className="w-64 cursor-not-allowed rounded-full border border-stone-200 bg-stone-50 py-1.5 pl-9 pr-4 text-sm text-stone-400"
-              />
-            </div>
+            {/* 全局搜索（跨实体）：桌面端搜索框，小屏折叠为图标按钮 */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="hidden cursor-pointer items-center gap-2 rounded-full border border-stone-200 bg-stone-50 py-1.5 pl-3 pr-2 text-sm text-stone-400 transition-colors hover:border-violet-300 hover:text-stone-600 lg:flex"
+            >
+              <Search className="size-4" />
+              <span className="w-44 text-left">搜索人物 / 章节 / 伏笔…</span>
+              <kbd className="rounded border border-stone-300 bg-white px-1.5 py-0.5 text-[10px] text-stone-500">{SHORTCUT}</kbd>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              aria-label="全局搜索"
+              className="cursor-pointer rounded-full p-2 text-stone-500 transition-colors hover:bg-stone-100 lg:hidden"
+            >
+              <Search className="size-4" />
+            </button>
           </div>
         </div>
       </header>
       <main className="flex-1">
         <Outlet />
       </main>
+
+      {searchOpen && <GlobalSearchModal onClose={() => setSearchOpen(false)} />}
     </div>
   )
 }

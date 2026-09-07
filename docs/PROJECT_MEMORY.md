@@ -38,6 +38,8 @@
 | `components/writing/CommentModal.tsx` | **批注面板（US-1001）**：新建批注（可引用选中文本/署名）、回复、解决/重开、删除（删根连带回复）、仅看未解决 |
 | `services/health.ts` | **故事健康度报告**：五维评分（伏笔回收 25 / 人物弧光 25 / 时间线连贯 20 / 一致性 20 / 章节进度 10）→ 加权总分、等级、可执行建议 |
 | `pages/project/HealthReportPage.tsx` | 体检报告页（路由 `/projects/:id/health`，侧栏「体检报告」）：总分卡 + 建议清单 + 五维明细卡 |
+| `services/search.ts` | **全局搜索**：`searchDataset`/`searchDatasets` 跨 9 类实体匹配（项目/人物/地点/事件/章节正文/伏笔/灵感/大纲/批注），字段权重打分、同实体取最佳字段、返回高亮片段区间与跳转 URL |
+| `components/search/GlobalSearchModal.tsx` | 搜索面板：按需加载项目数据（不常驻）、当前项目/全部项目切换、↑↓ 键盘选择 + Enter 跳转、命中词 `<mark>` 高亮、结果计数 |
 | `services/merge.ts` | **共享合并（US-1002）**：`buildMergePlan`（本地 vs 远端 JSON 实体级差异：added/changed/localNewer/removed + 差异字段）、`applyMergePlan`（远端行写入时覆盖 projectId）、`defaultSelection` |
 | `components/settings/MergeWizardModal.tsx` | 合并向导：按实体类型分组勾选差异（默认勾选远端新增/更新），全选/清空、合并计数 |
 | `services/exportDoc.ts` | **导出扩展（US-701）**：`exportChaptersDocx`（动态 import `docx` 库，独立 chunk）、`chaptersToPrintHtml`+`printHtml`（打印对话框另存 PDF，A4 排版） |
@@ -87,6 +89,7 @@
 
 - **US-205 大纲拖拽排序（已交付）**：大纲树行整行可拖拽，行上缘 28%=插入到目标之前、下缘 28%=之后、中部=成为目标子节点；`computeOutlineMove` 防环（不能拖到自己后代下）+ 层级约束（`allowedChildTypes`：root→act/free、act→chapter/free/act、chapter→scene/free、scene→无子），非法放置给中文提示条；order 在目标同级内归一 0..n-1 后批量 `outlineRepo.update`。
 - **US-1002 共享合并（已交付，执行案外）**：项目设置页「协作与合并」→ 选择外部导出的项目 JSON → `buildMergePlan` 按实体 id 比对 12 张表，分「远端新增 / 远端更新 / 本地更新 / 远端缺失」四类（含差异字段名与两端时间戳），向导默认只勾选远端新增与远端更新，应用时远端行 `projectId` 覆盖为当前项目；「远端缺失」勾选会删除本地记录，需手动确认。
+- **全局搜索（已完善）**：顶栏入口 + `⌘K/Ctrl K` 快捷键；`services/search.ts` 纯函数计算（数据由面板打开时按需加载，关闭即释放，不全量常驻）。搜索范围默认当前项目，可切「全部项目」。结果按 `score` 排序：权重（项目名 6/名称标题 5/别名标签 3/正文 1）+ 命中位置（越靠前越高）。跳转：人物→人物详情页、章节→写作区 `?chapter=id`、批注→对应章节写作区，其余→对应模块列表页。
 - **体检报告 AI 解读（已交付）**：体检页「AI 解读」把总分/等级/五维摘要/系统建议交给 LLM，输出总体诊断 + 优先事项 + 下一步（需先配置 AI 服务）。
 - **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
 - **分屏参考（US-501b/505 已交付）**：写作区头部「分屏参考」开关，左面板展示本章关联设定——细纲概要、出场人物（含当前状态；细纲未标记时按正文提及人物名/别名兜底匹配）、地点（细纲 scene.locationId 或正文提及）、伏笔（本章埋设/回收 + 其它待回收提醒）、关键事件（细纲 keyEventIds）。
@@ -121,7 +124,11 @@
 
 ## 8. 最近变更
 
-### 本轮（执行案外 Backlog 收尾）
+### 本轮（全局搜索完善）
+- 新增：`services/search.ts`、`components/search/GlobalSearchModal.tsx`；`AppLayout` 顶栏搜索框由「开发中」占位改为可用入口（桌面搜索框带 `⌘K/Ctrl K` 提示，小屏折叠为图标按钮），并注册 `Cmd/Ctrl+K` 全局快捷键。
+- 能力：跨 9 类实体搜索（人物含别名/标签/欲望/缺陷/背景/当前状态，章节含正文纯文本，另有项目/地点/事件/伏笔/灵感/大纲/批注）；字段权重打分（名称 5 > 别名/标签 3 > 正文 1，命中位置靠前加分），同实体保留最佳字段命中；结果带类型徽标、命中字段、高亮片段；当前项目 / 全部项目范围切换；键盘 ↑↓ + Enter 打开 + Esc 关闭，选中项自动滚入可视区。
+
+### 上一轮（执行案外 Backlog 收尾）
 - 新增：`services/merge.ts`、`components/settings/MergeWizardModal.tsx`；`services/outline.ts` 增 `computeOutlineMove`/`applyOutlineMove`（US-205）；`services/ai/tasks.ts` 增 `explainHealthReport`。
 - 修改：`OutlinePage` 树节点支持 HTML5 拖拽（上/下缘=同级前后、中部=成为子节点，落点高亮 + 层级约束报错提示）；`HealthReportPage` 增「AI 解读」；`ProjectSettingsPage` 增「协作与合并（US-1002）」面板与文件选择。
 - 验收：大纲可拖拽调序与跨层；体检报告可让 AI 给出解读；设置页可选外部项目 JSON 逐项合并差异。
