@@ -1,9 +1,16 @@
 import { useMemo, useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Eye, Sparkles } from 'lucide-react'
 import { Badge, Button, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { generateRelationshipSuggestions, type RelationshipSuggestion } from '@/services/ai/tasks'
+import {
+  generateRelationshipSuggestions,
+  parseRelationshipSuggestions,
+  runCustomPrompt,
+  type RelationshipSuggestion,
+} from '@/services/ai/tasks'
+import { buildRelationshipPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from './PromptPreviewModal'
 import { relationshipRepo } from '@/db/repositories'
 import { createEntity } from '@/utils/common'
 import type { Character, Relationship } from '@/types'
@@ -29,6 +36,7 @@ export default function RelationshipSuggestModal({
   const [count, setCount] = useState(5)
   const [checked, setChecked] = useState<Record<number, boolean>>({})
   const [saving, setSaving] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error, result, run, cancel } = useAITask<RelationshipSuggestion[]>()
 
   /** 已存在关系对（无方向，按 id 排序归一） */
@@ -43,15 +51,28 @@ export default function RelationshipSuggestModal({
     return existing.has([s.sourceId, s.targetId].sort().join('|'))
   }
 
-  async function handleGenerate() {
-    const list = await run((signal) =>
-      generateRelationshipSuggestions(
-        characters,
-        { focusName: focus, extra, projectContext, max: count },
-        loadAIConfig(),
-        signal,
-      ),
-    )
+  async function handleGenerate(custom?: { userText: string; systemText: string }) {
+    const list = custom
+      ? await run(async (signal) =>
+          parseRelationshipSuggestions(
+            await runCustomPrompt(
+              { projectId, kind: 'relationship', inputSummary: focus },
+              custom.userText,
+              custom.systemText,
+              loadAIConfig(),
+              signal,
+            ),
+            characters,
+          ),
+        )
+      : await run((signal) =>
+          generateRelationshipSuggestions(
+            characters,
+            { focusName: focus, extra, projectContext, max: count, projectId },
+            loadAIConfig(),
+            signal,
+          ),
+        )
     if (list) {
       const next: Record<number, boolean> = {}
       list.forEach((s, i) => {
@@ -98,6 +119,14 @@ export default function RelationshipSuggestModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={characters.length < 2}
+            onClick={() => setPreviewOpen(true)}
+            title="查看并编辑将要发送的提示"
+          >
+            <Eye className="size-4" /> 提示预览
           </Button>
           {result ? (
             <>
@@ -189,6 +218,17 @@ export default function RelationshipSuggestModal({
           </ul>
         )}
       </div>
+      {previewOpen && (
+        <PromptPreviewModal
+          title="人物关系建议"
+          messages={withSystem(buildRelationshipPrompt(characters, { focusName: focus, extra, projectContext, max: count }))}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleGenerate({ userText, systemText })
+          }}
+        />
+      )}
     </Modal>
   )
 }

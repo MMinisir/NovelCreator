@@ -569,6 +569,7 @@ function ChapterEditor({
         <PolishModal
           original={selection.text}
           context={title || '未命名章节'}
+          projectId={chapter.projectId}
           onClose={() => setPolishOpen(false)}
           onApply={(text) => {
             const ok = editorApiRef.current.current?.replaceSelectionWithText(text) ?? false

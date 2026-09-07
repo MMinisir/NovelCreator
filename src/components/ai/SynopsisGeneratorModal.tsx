@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { generateSynopsisText, parseSynopsis } from '@/services/ai/tasks'
+import { generateSynopsisText, parseSynopsis, runCustomPrompt } from '@/services/ai/tasks'
+import { buildSynopsisPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from './PromptPreviewModal'
 import { SYNOPSIS_PARTS, applySynopsis } from '@/services/outline'
 import type { Character, Project } from '@/types'
 
@@ -25,18 +27,36 @@ export default function SynopsisGeneratorModal({
   const [style, setStyle] = useState('')
   const [lines, setLines] = useState<string[] | null>(null)
   const [applying, setApplying] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
-  async function handleGenerate() {
-    const context = characters.length
+  function buildContext(): string | undefined {
+    return characters.length
       ? `【主要人物】\n${characters
           .slice(0, 10)
           .map((c) => `- ${c.name}${c.personalityTags.length ? `（${c.personalityTags.slice(0, 3).join('、')}）` : ''}`)
           .join('\n')}\n【一句话简介】${project.tagline ?? '（无）'}`
       : undefined
-    const text = await run((signal) =>
-      generateSynopsisText({ genre, premise, characters: chars, style, projectContext: context }, loadAIConfig(), signal),
-    )
+  }
+
+  async function handleGenerate(custom?: { userText: string; systemText: string }) {
+    const text = custom
+      ? await run((signal) =>
+          runCustomPrompt(
+            { projectId: project.id, kind: 'synopsis', inputSummary: premise },
+            custom.userText,
+            custom.systemText,
+            loadAIConfig(),
+            signal,
+          ),
+        )
+      : await run((signal) =>
+          generateSynopsisText(
+            { genre, premise, characters: chars, style, projectContext: buildContext(), projectId: project.id },
+            loadAIConfig(),
+            signal,
+          ),
+        )
     if (text) {
       const parsed = parseSynopsis(text)
       setLines(parsed)
@@ -66,6 +86,9 @@ export default function SynopsisGeneratorModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
+            <Eye className="size-4" /> 提示预览
           </Button>
           {lines ? (
             <>
@@ -130,6 +153,19 @@ export default function SynopsisGeneratorModal({
           </div>
         )}
       </div>
+      {previewOpen && (
+        <PromptPreviewModal
+          title="五句话梗概"
+          messages={withSystem(
+            buildSynopsisPrompt({ genre, premise, characters: chars, style, projectContext: buildContext() }),
+          )}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleGenerate({ userText, systemText })
+          }}
+        />
+      )}
     </Modal>
   )
 }

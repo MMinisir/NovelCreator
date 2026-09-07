@@ -90,6 +90,8 @@ class ProjectRepository extends ProjectScopedRepository<import('@/types/project'
       for (const s of stores) {
         await new ProjectScopedRepository(s).removeByProject(projectId)
       }
+      // AI 请求日志不参与导出，但随项目删除一并清理
+      await db.ai_request_logs.where('projectId').equals(projectId).delete()
       await this.remove(projectId)
     })
   }

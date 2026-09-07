@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { CheckCircle2, ExternalLink, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
+import { CheckCircle2, ExternalLink, Eye, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { runDeepConsistencyCheck } from '@/services/ai/tasks'
+import { parseDeepConsistencyIssues, runCustomPrompt, runDeepConsistencyCheck } from '@/services/ai/tasks'
+import { buildDeepConsistencyPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -44,6 +46,7 @@ export default function ConsistencyPage() {
 
   const [filter, setFilter] = useState<'all' | IssueLevel>('all')
   const [aiIssues, setAiIssues] = useState<ConsistencyIssue[]>([])
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<ConsistencyIssue[]>()
 
   const issues = useMemo(
@@ -65,23 +68,25 @@ export default function ConsistencyPage() {
   const filtered = filter === 'all' ? merged : merged.filter((i) => i.level === filter)
 
   /** AI 语义深度检查（US-805 LLM 增强）：与规则引擎互补，可返回空数组 */
-  async function handleDeep() {
-    const data = await run((signal) =>
-      runDeepConsistencyCheck(
-        {
-          project,
-          characters,
-          locations,
-          events,
-          chapters,
-          foreshadowings,
-          outlineNodes,
-          existingIssues: issues,
-        },
-        loadAIConfig(),
-        signal,
-      ),
-    )
+  const deepInput = useMemo(
+    () => ({ project, characters, locations, events, chapters, foreshadowings, outlineNodes, existingIssues: issues }),
+    [project, characters, locations, events, chapters, foreshadowings, outlineNodes, issues],
+  )
+
+  async function handleDeep(custom?: { userText: string; systemText: string }) {
+    const data = custom
+      ? await run(async (signal) =>
+          parseDeepConsistencyIssues(
+            await runCustomPrompt(
+              { projectId, kind: 'consistency', inputSummary: project?.name },
+              custom.userText,
+              custom.systemText,
+              loadAIConfig(),
+              signal,
+            ),
+          ),
+        )
+      : await run((signal) => runDeepConsistencyCheck(deepInput, loadAIConfig(), signal))
     if (data) setAiIssues(data)
   }
 
@@ -112,6 +117,9 @@ export default function ConsistencyPage() {
               停止
             </Button>
           )}
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
+            <Eye className="size-4" /> 提示预览
+          </Button>
           <Button variant="primary" loading={loading} onClick={() => void handleDeep()}>
             <Sparkles className="size-4" /> AI 深度检查
           </Button>
@@ -176,6 +184,18 @@ export default function ConsistencyPage() {
             />
           ))}
         </ul>
+      )}
+
+      {previewOpen && (
+        <PromptPreviewModal
+          title="一致性深度检查"
+          messages={withSystem(buildDeepConsistencyPrompt(deepInput))}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleDeep({ userText, systemText })
+          }}
+        />
       )}
     </div>
   )

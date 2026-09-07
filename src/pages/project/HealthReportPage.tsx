@@ -1,9 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRight, HeartPulse, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowRight, Eye, HeartPulse, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { explainHealthReport } from '@/services/ai/tasks'
+import { explainHealthReport, runCustomPrompt } from '@/services/ai/tasks'
+import { buildHealthExplainPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
 import { Badge, Button, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -64,13 +66,28 @@ export default function HealthReportPage() {
   )
 
   const { loading: aiLoading, error: aiError, result: aiText, run, cancel } = useAITask<string>()
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   function refreshAll() {
     void Promise.all([r1(), r2(), r3(), r4(), r5(), r6(), r7(), r8()])
   }
 
-  async function handleAIExplain() {
-    await run((signal) => explainHealthReport({ projectName: project?.name ?? '', report }, loadAIConfig(), signal))
+  async function handleAIExplain(custom?: { userText: string; systemText: string }) {
+    if (custom) {
+      await run((signal) =>
+        runCustomPrompt(
+          { projectId, kind: 'health', inputSummary: project?.name },
+          custom.userText,
+          custom.systemText,
+          loadAIConfig(),
+          signal,
+        ),
+      )
+      return
+    }
+    await run((signal) =>
+      explainHealthReport({ projectName: project?.name ?? '', report, projectId }, loadAIConfig(), signal),
+    )
   }
 
   return (
@@ -90,6 +107,9 @@ export default function HealthReportPage() {
           )}
           <Button variant="secondary" onClick={refreshAll}>
             <RefreshCw className="size-4" /> 重新生成
+          </Button>
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
+            <Eye className="size-4" /> 提示预览
           </Button>
           <Button variant="primary" loading={aiLoading} onClick={() => void handleAIExplain()}>
             <Sparkles className="size-4" /> AI 解读
@@ -188,6 +208,18 @@ export default function HealthReportPage() {
           </section>
         ))}
       </div>
+
+      {previewOpen && (
+        <PromptPreviewModal
+          title="体检报告解读"
+          messages={withSystem(buildHealthExplainPrompt({ projectName: project?.name ?? '', report }))}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleAIExplain({ userText, systemText })
+          }}
+        />
+      )}
     </div>
   )
 }

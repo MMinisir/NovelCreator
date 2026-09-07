@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { generateCharacterBioText, textToHtmlParagraphs } from '@/services/ai/tasks'
+import { generateCharacterBioText, runCustomPrompt, textToHtmlParagraphs } from '@/services/ai/tasks'
+import { buildBioPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from './PromptPreviewModal'
 import type { Character } from '@/types'
 
 /** 人物小传生成器（Sprint 7 US-803）：基于已有设定生成小传，可编辑后写入背景故事 */
@@ -21,12 +23,23 @@ export default function CharacterBioModal({
   const [extra, setExtra] = useState('')
   const [words, setWords] = useState(400)
   const [text, setText] = useState<string | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
-  async function handleGenerate() {
-    const result = await run((signal) =>
-      generateCharacterBioText(character, { extra, words, projectContext }, loadAIConfig(), signal),
-    )
+  async function handleGenerate(custom?: { userText: string; systemText: string }) {
+    const result = custom
+      ? await run((signal) =>
+          runCustomPrompt(
+            { projectId: character.projectId, kind: 'characterBio', inputSummary: character.name },
+            custom.userText,
+            custom.systemText,
+            loadAIConfig(),
+            signal,
+          ),
+        )
+      : await run((signal) =>
+          generateCharacterBioText(character, { extra, words, projectContext }, loadAIConfig(), signal),
+        )
     if (!result) return
     setText(result.trim())
     if (!result.trim()) setError('AI 返回内容为空，可补充人物设定后重试')
@@ -43,6 +56,9 @@ export default function CharacterBioModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
+            <Eye className="size-4" /> 提示预览
           </Button>
           {text ? (
             <>
@@ -86,6 +102,17 @@ export default function CharacterBioModal({
           </Field>
         )}
       </div>
+      {previewOpen && (
+        <PromptPreviewModal
+          title="人物小传"
+          messages={withSystem(buildBioPrompt(character, { extra, words, projectContext }))}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleGenerate({ userText, systemText })
+          }}
+        />
+      )}
     </Modal>
   )
 }

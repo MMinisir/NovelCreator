@@ -17,6 +17,7 @@ import ForeshadowingsPage from '@/pages/project/ForeshadowingsPage'
 import IdeasPage from '@/pages/project/IdeasPage'
 import ConsistencyPage from '@/pages/project/ConsistencyPage'
 import HealthReportPage from '@/pages/project/HealthReportPage'
+import AIHistoryPage from '@/pages/project/AIHistoryPage'
 
 /** 路由结构（设计文档 §6.1 导航：项目 -> 人物/地点/事件/大纲/时间线/关系图/伏笔/写作/灵感/设置） */
 export default function App() {
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="ideas" element={<IdeasPage />} />
           <Route path="consistency" element={<ConsistencyPage />} />
           <Route path="health" element={<HealthReportPage />} />
+          <Route path="ai-log" element={<AIHistoryPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
           <Route path=":module" element={<ModulePlaceholderPage />} />
         </Route>

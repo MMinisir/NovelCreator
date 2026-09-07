@@ -65,6 +65,37 @@ export interface Comment extends BaseEntity {
   author?: string
 }
 
+/** AI 请求类型（用于 AI 历史记录与提示预览） */
+export type AIRequestKind =
+  | 'synopsis'
+  | 'characterBio'
+  | 'relationship'
+  | 'polish'
+  | 'consistency'
+  | 'health'
+  | 'characterCard'
+  | 'custom'
+
+/** AI 请求日志：保存完整提示、响应与耗时，供历史页复查（本机存储，不随项目导出） */
+export interface AIRequestLog {
+  id: string
+  /** 触发该请求的项目（全局请求可为空） */
+  projectId?: string
+  kind: AIRequestKind
+  label: string
+  createdAt: string
+  status: 'pending' | 'ok' | 'error' | 'aborted'
+  provider?: string
+  model?: string
+  /** 完整请求消息（system + user），即提示预览内容 */
+  messages: Array<{ role: 'system' | 'user'; content: string }>
+  /** 输入摘要，便于列表快速识别 */
+  inputSummary?: string
+  response?: string
+  error?: string
+  durationMs?: number
+}
+
 /** 提示词模板（设计文档 §2.6.3，projectId 为空表示全局内置） */
 export interface PromptTemplate extends BaseEntity {
   name: string

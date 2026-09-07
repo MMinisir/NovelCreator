@@ -1,21 +1,26 @@
 import { useMemo, useState } from 'react'
-import { Check, Diff, Sparkles } from 'lucide-react'
+import { Check, Diff, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea, cn } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
-import { polishText } from '@/services/ai/tasks'
+import { polishText, runCustomPrompt } from '@/services/ai/tasks'
+import { buildPolishPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from './PromptPreviewModal'
 import { diffLines, diffSummary } from '@/utils/diff'
 
 /** AI 润色选中文本（Sprint 9 US-806）：原文只读展示 + 结果可编辑 + 行差异对比，可一键替换选区 */
 export default function PolishModal({
   original,
   context,
+  projectId,
   onClose,
   onApply,
 }: {
   original: string
   /** 场景上下文（章节名等） */
   context?: string
+  /** 所属项目（请求日志归类） */
+  projectId?: string
   onClose: () => void
   /** 替换选区；选区已失效时返回 false */
   onApply: (text: string) => boolean
@@ -24,10 +29,21 @@ export default function PolishModal({
   const [text, setText] = useState<string | null>(null)
   const [showDiff, setShowDiff] = useState(false)
   const [note, setNote] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
-  async function handleGenerate() {
-    const result = await run((signal) => polishText({ text: original, context, style }, loadAIConfig(), signal))
+  async function handleGenerate(custom?: { userText: string; systemText: string }) {
+    const result = custom
+      ? await run((signal) =>
+          runCustomPrompt(
+            { projectId, kind: 'polish', inputSummary: context },
+            custom.userText,
+            custom.systemText,
+            loadAIConfig(),
+            signal,
+          ),
+        )
+      : await run((signal) => polishText({ text: original, context, style, projectId }, loadAIConfig(), signal))
     if (!result) return
     const trimmed = result.trim()
     setText(trimmed)
@@ -61,6 +77,9 @@ export default function PolishModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
+            <Eye className="size-4" /> 提示预览
           </Button>
           {loading && (
             <Button variant="ghost" onClick={cancel}>
@@ -133,6 +152,17 @@ export default function PolishModal({
           </>
         )}
       </div>
+      {previewOpen && (
+        <PromptPreviewModal
+          title="润色选中文本"
+          messages={withSystem(buildPolishPrompt({ text: original, context, style }))}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleGenerate({ userText, systemText })
+          }}
+        />
+      )}
     </Modal>
   )
 }

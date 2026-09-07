@@ -1,10 +1,18 @@
 import { useState } from 'react'
-import { Check, Sparkles } from 'lucide-react'
+import { Check, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Select, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { characterRepo } from '@/db/repositories'
 import { loadAIConfig } from '@/services/ai/config'
-import { generateCharacterCard, textToHtmlParagraphs, type CharacterCardDraft } from '@/services/ai/tasks'
+import {
+  generateCharacterCard,
+  parseCharacterCard,
+  runCustomPrompt,
+  textToHtmlParagraphs,
+  type CharacterCardDraft,
+} from '@/services/ai/tasks'
+import { buildCharacterCardPrompt, withSystem } from '@/services/ai/prompts'
+import PromptPreviewModal from './PromptPreviewModal'
 import { createEntity } from '@/utils/common'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character } from '@/types'
 
@@ -34,20 +42,33 @@ export default function CharacterCardModal({
   const [draft, setDraft] = useState<CharacterCardDraft | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<CharacterCardDraft>()
 
-  async function handleGenerate() {
+  async function handleGenerate(custom?: { userText: string; systemText: string }) {
     if (!prompt.trim()) {
       setAiError('请先写一句话设定，如“一个在末世中靠回收旧物为生的少女机械师”')
       return
     }
-    const data = await run((signal) =>
-      generateCharacterCard(
-        { prompt, extra, genre, worldContext: projectContext, existingNames },
-        loadAIConfig(),
-        signal,
-      ),
-    )
+    const data = custom
+      ? await run(async (signal) =>
+          parseCharacterCard(
+            await runCustomPrompt(
+              { projectId, kind: 'characterCard', inputSummary: prompt },
+              custom.userText,
+              custom.systemText,
+              loadAIConfig(),
+              signal,
+            ),
+          ),
+        )
+      : await run((signal) =>
+          generateCharacterCard(
+            { prompt, extra, genre, worldContext: projectContext, existingNames, projectId },
+            loadAIConfig(),
+            signal,
+          ),
+        )
     if (data) setDraft(data)
   }
 
@@ -101,6 +122,14 @@ export default function CharacterCardModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={!prompt.trim()}
+            onClick={() => setPreviewOpen(true)}
+            title="查看并编辑将要发送的提示"
+          >
+            <Eye className="size-4" /> 提示预览
           </Button>
           {loading && (
             <Button variant="ghost" onClick={cancel}>
@@ -211,6 +240,19 @@ export default function CharacterCardModal({
           </div>
         )}
       </div>
+      {previewOpen && (
+        <PromptPreviewModal
+          title="一句话角色卡"
+          messages={withSystem(
+            buildCharacterCardPrompt({ prompt, extra, genre, worldContext: projectContext, existingNames }),
+          )}
+          onClose={() => setPreviewOpen(false)}
+          onGenerate={(userText, systemText) => {
+            setPreviewOpen(false)
+            void handleGenerate({ userText, systemText })
+          }}
+        />
+      )}
     </Modal>
   )
 }

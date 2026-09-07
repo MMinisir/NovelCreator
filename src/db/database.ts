@@ -5,6 +5,7 @@ import type { Foreshadowing, IdeaFragment, Comment, PromptTemplate, BackupMetada
 import type { OutlineNode } from '@/types/outline'
 import type { Project } from '@/types/project'
 import type { Relationship, Location, StoryEvent } from '@/types/world'
+import type { AIRequestLog } from '@/types/meta'
 
 /**
  * IndexedDB Schema（设计文档 §5.2 数据存储设计）
@@ -30,6 +31,7 @@ class NovelDatabase extends Dexie {
   prompt_templates!: EntityTable<PromptTemplate, 'id'>
   backup_metadata!: EntityTable<BackupMetadata, 'id'>
   backup_settings!: EntityTable<BackupSettings, 'id'>
+  ai_request_logs!: EntityTable<AIRequestLog, 'id'>
 
   constructor() {
     super(DB_NAME)
@@ -55,6 +57,10 @@ class NovelDatabase extends Dexie {
     // Sprint 7 US-702：自动备份设置（单条 id='auto'）
     this.version(2).stores({
       backup_settings: 'id',
+    })
+    // AI 请求历史（提示预览 + 请求留痕；不参与项目导出/合并）
+    this.version(3).stores({
+      ai_request_logs: 'id, projectId, kind, createdAt',
     })
     // 数据迁移策略：后续结构变更在此追加 version(n).upgrade(...) 迁移函数
   }

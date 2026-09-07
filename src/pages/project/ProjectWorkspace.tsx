@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import {
+  Activity,
   ArrowLeft,
   BookOpen,
   CalendarClock,
@@ -34,6 +35,7 @@ const MODULES = [
   { path: 'ideas', label: '灵感碎片', icon: Lightbulb },
   { path: 'consistency', label: '一致性检查', icon: ShieldCheck },
   { path: 'health', label: '体检报告', icon: HeartPulse },
+  { path: 'ai-log', label: 'AI 请求', icon: Activity },
   { path: 'settings', label: '项目设置', icon: Settings },
 ]
 
