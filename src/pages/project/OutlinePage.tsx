@@ -1,10 +1,29 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { BookOpen, ChevronDown, ChevronRight, FileText, Film, FolderTree, ListTree, Plus, StickyNote } from 'lucide-react'
+import {
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Film,
+  FolderTree,
+  GripVertical,
+  ListTree,
+  Plus,
+  StickyNote,
+} from 'lucide-react'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
 import { chapterRepo, characterRepo, eventRepo, locationRepo, outlineRepo } from '@/db/repositories'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
-import { STRUCTURAL_TYPES, addOutlineChild, ensureOutlineSeed, listForeshadowings } from '@/services/outline'
+import {
+  STRUCTURAL_TYPES,
+  addOutlineChild,
+  applyOutlineMove,
+  computeOutlineMove,
+  ensureOutlineSeed,
+  listForeshadowings,
+  type DropPosition,
+} from '@/services/outline'
 import type { Foreshadowing } from '@/types/meta'
 import type { OutlineNode, OutlineNodeType } from '@/types/outline'
 import { StoryCoreCard, LoglineCard } from '@/components/outline/OutlineSetupCards'
@@ -40,6 +59,10 @@ export default function OutlinePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const seededFor = useRef<string | null>(null)
+  // US-205 拖拽排序状态
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [dropInfo, setDropInfo] = useState<{ id: string; position: DropPosition } | null>(null)
+  const [moveError, setMoveError] = useState('')
 
   useEffect(() => {
     if (projectId && loaded && seededFor.current !== projectId) {
@@ -104,6 +127,24 @@ export default function OutlinePage() {
     navigate(`/projects/${projectId}/writing?chapter=${chapterId}`)
   }
 
+  /** US-205：放置时计算并应用移动（跨层级/同级排序） */
+  async function handleDrop(targetId: string) {
+    const position = dropInfo?.position ?? 'inside'
+    const id = dragId
+    setDragId(null)
+    setDropInfo(null)
+    if (!id) return
+    const result = computeOutlineMove(nodes, id, targetId, position)
+    if (!result.ok) {
+      setMoveError(result.error)
+      return
+    }
+    setMoveError('')
+    await applyOutlineMove(result.patches)
+    await refresh()
+    setSelectedId(id)
+  }
+
   function renderTree(list: OutlineNode[], depth: number): React.ReactNode {
     return list.map((node) => {
       const kids = childrenOf.get(node.id) ?? []
@@ -121,10 +162,44 @@ export default function OutlinePage() {
             onKeyDown={(e) => {
               if (e.key === 'Enter') setSelectedId(node.id)
             }}
+            draggable
+            onDragStart={(e) => {
+              e.dataTransfer.effectAllowed = 'move'
+              e.dataTransfer.setData('text/plain', node.id)
+              setDragId(node.id)
+            }}
+            onDragOver={(e) => {
+              if (!dragId) return
+              e.preventDefault()
+              e.dataTransfer.dropEffect = 'move'
+              const rect = e.currentTarget.getBoundingClientRect()
+              const ratio = (e.clientY - rect.top) / (rect.height || 1)
+              const position: DropPosition = ratio < 0.28 ? 'before' : ratio > 0.72 ? 'after' : 'inside'
+              setDropInfo((prev) => (prev && prev.id === node.id && prev.position === position ? prev : { id: node.id, position }))
+            }}
+            onDragLeave={() => setDropInfo((prev) => (prev?.id === node.id ? null : prev))}
+            onDrop={(e) => {
+              e.preventDefault()
+              void handleDrop(node.id)
+            }}
+            onDragEnd={() => {
+              setDragId(null)
+              setDropInfo(null)
+            }}
             style={{ paddingLeft: depth * 18 + 8 }}
             className={cn(
-              'group flex cursor-pointer items-center gap-1.5 rounded-lg py-1.5 pr-2 text-sm transition-colors',
+              'group flex cursor-pointer items-center gap-1.5 rounded-lg border-y-2 border-transparent py-1.5 pr-2 text-sm transition-colors',
               selectedId === node.id ? 'bg-violet-100 text-violet-900' : 'text-stone-700 hover:bg-stone-100',
+              dragId === node.id && 'opacity-50',
+              dropInfo?.id === node.id &&
+                dropInfo.position === 'before' &&
+                'border-t-violet-500',
+              dropInfo?.id === node.id &&
+                dropInfo.position === 'after' &&
+                'border-b-violet-500',
+              dropInfo?.id === node.id &&
+                dropInfo.position === 'inside' &&
+                'bg-violet-50 ring-1 ring-violet-300',
             )}
           >
             <span className="flex size-4 shrink-0 items-center justify-center">
@@ -143,6 +218,13 @@ export default function OutlinePage() {
             {linked && <FileText className="size-3.5 shrink-0 text-emerald-500" aria-label="已有正文草稿" />}
             {planted > 0 && <Badge color="amber">{planted} 埋</Badge>}
             {resolved > 0 && <Badge color="green">{resolved} 收</Badge>}
+            <span
+              className="shrink-0 cursor-grab text-stone-300 opacity-0 transition-opacity group-hover:opacity-100 active:cursor-grabbing"
+              title="拖拽调整层级与顺序"
+              aria-hidden
+            >
+              <GripVertical className="size-3.5" />
+            </span>
           </div>
           {isOpen && kids.length > 0 && renderTree(kids, depth + 1)}
         </div>
@@ -199,8 +281,16 @@ export default function OutlinePage() {
                 <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-400">
                   <FolderTree className="size-4" /> 分幕与章节细纲
                 </h2>
-                <span className="text-xs text-stone-400">US-203 · 拖拽排序规划中（US-205）</span>
+                <span className="text-xs text-stone-400">拖拽节点调整层级与顺序（US-205）· 放到行中部成为子节点</span>
               </div>
+              {moveError && (
+                <p className="mb-2 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-xs text-red-700">
+                  {moveError}
+                  <button onClick={() => setMoveError('')} className="ml-auto cursor-pointer text-red-500 hover:text-red-700">
+                    关闭
+                  </button>
+                </p>
+              )}
               {treeRoots.length === 0 ? (
                 <EmptyState
                   icon={<ListTree className="size-6" />}

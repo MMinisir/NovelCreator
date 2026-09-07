@@ -1,6 +1,6 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
-import { CheckCircle2, Save } from 'lucide-react'
+import { CheckCircle2, GitMerge, Save } from 'lucide-react'
 import { Badge, Button, Field, Input, Select, Textarea } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { PROJECT_STATUS_LABELS, PROJECT_TEMPLATE_LABELS } from '@/types/project'
@@ -8,6 +8,9 @@ import type { Project, ProjectMode, ProjectStatus } from '@/types/project'
 import { PROJECT_GENRES } from '@/components/project/ProjectFormModal'
 import AIConfigPanel from '@/components/ai/AIConfigPanel'
 import BackupPanel from '@/components/backup/BackupPanel'
+import MergeWizardModal from '@/components/settings/MergeWizardModal'
+import { buildMergePlan, type MergePlan } from '@/services/merge'
+import { readFileAsText } from '@/utils/common'
 
 const NARRATIONS = ['第三人称限知视角', '第三人称全知视角', '第一人称', '多视角', '其他']
 
@@ -27,6 +30,8 @@ export default function ProjectSettingsPage() {
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form, setForm] = useState<Project | null>(null)
+  const [mergePlan, setMergePlan] = useState<MergePlan | null>(null) // US-1002
+  const mergeFileRef = useRef<HTMLInputElement>(null)
 
   // 项目数据变化时同步到表单
   useEffect(() => {
@@ -75,6 +80,17 @@ export default function ProjectSettingsPage() {
       setTimeout(() => setSaved(false), 2500)
     } finally {
       setSaving(false)
+    }
+  }
+
+  /** US-1002：选择他人/其它设备导出的项目 JSON，进入合并向导 */
+  async function handleMergeFile(file: File) {
+    if (!projectId) return
+    try {
+      const text = await readFileAsText(file)
+      setMergePlan(await buildMergePlan(projectId, text))
+    } catch (err) {
+      window.alert(`无法解析该文件：${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
@@ -246,6 +262,41 @@ export default function ProjectSettingsPage() {
       {/* AI 服务配置（US-801）与自动备份（US-702/703）：面板内按钮均为 type=button，不会提交项目表单 */}
       <AIConfigPanel />
       <BackupPanel projectId={projectId ?? ''} />
+
+      {/* 协作与合并（US-1002）：交换项目 JSON 后逐项合并差异 */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-400">协作与合并（US-1002）</h2>
+        <p className="mb-3 text-sm text-stone-500">
+          数据全部在本地：与他人协作时交换导出的项目 JSON，可在此逐项比对并合并差异（默认勾选「远端新增 / 远端更新」，
+          「本地更新」「远端缺失」需手动确认，避免误覆盖或误删）。
+        </p>
+        <input
+          ref={mergeFileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0]
+            e.target.value = ''
+            if (file) void handleMergeFile(file)
+          }}
+        />
+        <Button type="button" variant="secondary" onClick={() => mergeFileRef.current?.click()}>
+          <GitMerge className="size-4" /> 选择项目文件合并…
+        </Button>
+      </section>
+
+      {mergePlan && projectId && (
+        <MergeWizardModal
+          projectId={projectId}
+          plan={mergePlan}
+          onClose={() => setMergePlan(null)}
+          onApplied={(count) => {
+            setMergePlan(null)
+            window.alert(`已合并 ${count} 项，切换到其它模块即可看到更新后的数据。`)
+          }}
+        />
+      )}
     </form>
   )
 }

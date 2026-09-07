@@ -38,6 +38,8 @@
 | `components/writing/CommentModal.tsx` | **批注面板（US-1001）**：新建批注（可引用选中文本/署名）、回复、解决/重开、删除（删根连带回复）、仅看未解决 |
 | `services/health.ts` | **故事健康度报告**：五维评分（伏笔回收 25 / 人物弧光 25 / 时间线连贯 20 / 一致性 20 / 章节进度 10）→ 加权总分、等级、可执行建议 |
 | `pages/project/HealthReportPage.tsx` | 体检报告页（路由 `/projects/:id/health`，侧栏「体检报告」）：总分卡 + 建议清单 + 五维明细卡 |
+| `services/merge.ts` | **共享合并（US-1002）**：`buildMergePlan`（本地 vs 远端 JSON 实体级差异：added/changed/localNewer/removed + 差异字段）、`applyMergePlan`（远端行写入时覆盖 projectId）、`defaultSelection` |
+| `components/settings/MergeWizardModal.tsx` | 合并向导：按实体类型分组勾选差异（默认勾选远端新增/更新），全选/清空、合并计数 |
 | `services/exportDoc.ts` | **导出扩展（US-701）**：`exportChaptersDocx`（动态 import `docx` 库，独立 chunk）、`chaptersToPrintHtml`+`printHtml`（打印对话框另存 PDF，A4 排版） |
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
 | `components/rich/RichTextEditor.tsx` | 新增选区 API：`EditorSelection`、`RichTextEditorAPI`（getSelection/replaceSelectionWithText）、`RichTextEditorAPIRef`（普通对象避开 React19 RefObject 只读 current）；`onSelectionUpdate` 上报选区、`onSelectionChange` 回调 |
@@ -78,11 +80,14 @@
 | 7 | AI 功能开放（US-801~804）、自动备份（US-702/703） | ✅（本轮） |
 | 8 | 一致性/写作辅助/版本历史（US-501b,504,505,805） | ✅（本轮） |
 | 9 | AI 审稿与移动端（US-806,805-LLM,902,903） | ✅（本轮） |
-| 10 | 协作批注、DOCX/PDF 导出、体检报告（US-1001,701,新增） | ✅（本轮） |
+| 10 | 协作批注、DOCX/PDF 导出、体检报告（US-1001,701,新增） | ✅（Sprint 10） |
+| 11（执行案外收尾） | US-205 大纲拖拽排序、US-1002 冲突检测与合并向导、体检报告 AI 解读 | ✅（本轮） |
 
 ## 6. 核心约定 / 待办（决策记录）
 
-- **US-205 大纲拖拽排序** → 待办（树组件行尾已预留）。
+- **US-205 大纲拖拽排序（已交付）**：大纲树行整行可拖拽，行上缘 28%=插入到目标之前、下缘 28%=之后、中部=成为目标子节点；`computeOutlineMove` 防环（不能拖到自己后代下）+ 层级约束（`allowedChildTypes`：root→act/free、act→chapter/free/act、chapter→scene/free、scene→无子），非法放置给中文提示条；order 在目标同级内归一 0..n-1 后批量 `outlineRepo.update`。
+- **US-1002 共享合并（已交付，执行案外）**：项目设置页「协作与合并」→ 选择外部导出的项目 JSON → `buildMergePlan` 按实体 id 比对 12 张表，分「远端新增 / 远端更新 / 本地更新 / 远端缺失」四类（含差异字段名与两端时间戳），向导默认只勾选远端新增与远端更新，应用时远端行 `projectId` 覆盖为当前项目；「远端缺失」勾选会删除本地记录，需手动确认。
+- **体检报告 AI 解读（已交付）**：体检页「AI 解读」把总分/等级/五维摘要/系统建议交给 LLM，输出总体诊断 + 优先事项 + 下一步（需先配置 AI 服务）。
 - **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
 - **分屏参考（US-501b/505 已交付）**：写作区头部「分屏参考」开关，左面板展示本章关联设定——细纲概要、出场人物（含当前状态；细纲未标记时按正文提及人物名/别名兜底匹配）、地点（细纲 scene.locationId 或正文提及）、伏笔（本章埋设/回收 + 其它待回收提醒）、关键事件（细纲 keyEventIds）。
 - **一致性检查（US-805 规则引擎+AI 语义已交付）**：路由 `/projects/:id/consistency`（侧栏「一致性检查」）。`services/consistency.ts` 纯函数规则：主角缺失、人物缺标签/欲望缺陷/当前状态、关系指向已删人物（error）、主要人物孤立、地点无描述、事件无时间/无参与者/引用不存在人物（error）、活跃伏笔无预期回收锚点（warn）、伏笔状态与大纲回收标记不一致（error）、活跃超 30 天、章节无正文/完成章字数不足目标 50%（warn）、大纲无分幕、细纲未展开正文。页面「AI 深度检查」→ `runDeepConsistencyCheck`：把人物清单+正文片段+伏笔+规则结果发给 LLM 做语义推断（人物已死仍出场/时间矛盾等），结果带紫色「AI 语义」徽标并入报告（id 前缀 `ai:`，不可跳转；category 白名单+「综合」兜底）。
@@ -116,7 +121,12 @@
 
 ## 8. 最近变更
 
-### Sprint 10（本轮）
+### 本轮（执行案外 Backlog 收尾）
+- 新增：`services/merge.ts`、`components/settings/MergeWizardModal.tsx`；`services/outline.ts` 增 `computeOutlineMove`/`applyOutlineMove`（US-205）；`services/ai/tasks.ts` 增 `explainHealthReport`。
+- 修改：`OutlinePage` 树节点支持 HTML5 拖拽（上/下缘=同级前后、中部=成为子节点，落点高亮 + 层级约束报错提示）；`HealthReportPage` 增「AI 解读」；`ProjectSettingsPage` 增「协作与合并（US-1002）」面板与文件选择。
+- 验收：大纲可拖拽调序与跨层；体检报告可让 AI 给出解读；设置页可选外部项目 JSON 逐项合并差异。
+
+### Sprint 10（历史）
 - 新增：`services/comments.ts`、`components/writing/CommentModal.tsx`、`services/health.ts`、`pages/project/HealthReportPage.tsx`、`services/exportDoc.ts`；依赖新增 `docx`（动态 import，独立 chunk）。
 - 修改：`WritingPage` 头部增「批注」（带未解决数角标，选中文本可直接「添加批注」并记住引用）+「导出 Word」「导出 PDF」；`App.tsx`/`ProjectWorkspace` 增 `/projects/:id/health` 路由与侧栏入口；`deleteChapterCascade` 级联删除章节批注。
 - Sprint 10 验收：正文可留批注（引用/回复/解决），写作区可导出 .docx 与打印 PDF，体检报告给出五维评分与建议。

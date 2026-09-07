@@ -3,6 +3,7 @@ import { buildCharacterContextBrief, buildProjectContextBrief } from './contextB
 import type { AIProviderConfig, ChatMessage } from './types'
 import { SYNOPSIS_PARTS } from '@/services/outline'
 import type { ConsistencyIssue, IssueLevel } from '@/services/consistency'
+import type { HealthReport } from '@/services/health'
 import type { Character, Location, Project, StoryEvent } from '@/types'
 
 /**
@@ -344,6 +345,30 @@ export function parseDeepConsistencyIssues(text: string): ConsistencyIssue[] {
     out.push({ id: `ai:${out.length}`, level, category, title: title || detail.slice(0, 30), detail })
   }
   return out
+}
+
+/* ---------------- 体检报告 AI 解读（Sprint 10 扩展） ---------------- */
+
+/** 对健康度报告做语义解读：总体诊断 + 优先行动建议 */
+export async function explainHealthReport(
+  input: { projectName: string; report: HealthReport },
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+): Promise<string> {
+  const { report } = input
+  const lines = [
+    `下面是小说《${input.projectName || '未命名作品'}》的故事体检评分，请给出编辑视角的解读与行动建议。`,
+    `要求：先一句话总体诊断；再指出最该优先处理的 2-3 件事；最后给出可执行的下一步（结合下面维度信息）。`,
+    `语气务实具体，避免空话；控制在 400 字以内，可分 2-3 段，不要 Markdown 标题符号。`,
+    ``,
+    `【总分】${report.total}/100（${report.level}）`,
+    `【维度】`,
+    ...report.dimensions.map((d) => `- ${d.label}：${d.score} 分（权重 ${d.weight}）· ${d.summary}`),
+    ``,
+    `【系统建议】`,
+    report.suggestions.length ? report.suggestions.map((s) => `- ${s}`).join('\n') : '（暂无）',
+  ]
+  return runPrompt(config, [{ role: 'user', content: lines.join('\n') }], signal)
 }
 
 /* ---------------- 上下文快捷构建 ---------------- */

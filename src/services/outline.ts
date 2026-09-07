@@ -205,6 +205,74 @@ export async function applySynopsis(projectId: string, lines: string[]): Promise
   }
 }
 
+/* ---------------- US-205 拖拽排序（Backlog） ---------------- */
+
+export type DropPosition = 'before' | 'after' | 'inside'
+
+export interface OutlineMovePatch {
+  id: string
+  parentId: string | null
+  order: number
+}
+
+export type OutlineMoveResult = { ok: true; patches: OutlineMovePatch[] } | { ok: false; error: string }
+
+/** candidate 是否为 ancestor 的后代（防环） */
+function isDescendant(nodes: OutlineNode[], candidateId: string, ancestorId: string): boolean {
+  let cur = nodes.find((n) => n.id === candidateId)
+  let guard = 0
+  while (cur?.parentId && guard < 1000) {
+    if (cur.parentId === ancestorId) return true
+    cur = nodes.find((n) => n.id === cur?.parentId)
+    guard += 1
+  }
+  return false
+}
+
+/**
+ * 计算拖拽移动结果（纯函数）：返回受影响同级节点的 parentId/order 补丁。
+ * 规则：不能移到自身或其后代下；目标父级需允许该节点类型（层级约束）。
+ */
+export function computeOutlineMove(
+  nodes: OutlineNode[],
+  dragId: string,
+  targetId: string,
+  position: DropPosition,
+): OutlineMoveResult {
+  const drag = nodes.find((n) => n.id === dragId)
+  const target = nodes.find((n) => n.id === targetId)
+  if (!drag || !target) return { ok: false, error: '节点不存在，请刷新后重试' }
+  if (dragId === targetId) return { ok: false, error: '不能移动到自身' }
+  if (isDescendant(nodes, targetId, dragId)) return { ok: false, error: '不能移动到自己的子节点下（会形成环）' }
+
+  const newParentId = position === 'inside' ? target.id : target.parentId
+  if (newParentId === dragId) return { ok: false, error: '不能移动到自身内部' }
+  const parent = newParentId ? nodes.find((n) => n.id === newParentId) : undefined
+  if (newParentId && !parent) return { ok: false, error: '目标父节点不存在' }
+  if (parent && !allowedChildTypes(parent.type).includes(drag.type)) {
+    return {
+      ok: false,
+      error: `「${NODE_TYPE_LABELS[parent.type] ?? parent.type}」下不能放置「${NODE_TYPE_LABELS[drag.type] ?? drag.type}」`,
+    }
+  }
+
+  const siblings = nodes.filter((n) => n.parentId === newParentId && n.id !== dragId).sort((a, b) => a.order - b.order)
+  let index = siblings.length
+  if (position !== 'inside') {
+    const ti = siblings.findIndex((n) => n.id === targetId)
+    index = ti < 0 ? siblings.length : position === 'before' ? ti : ti + 1
+  }
+  const ordered = [...siblings.slice(0, index), drag, ...siblings.slice(index)]
+  return { ok: true, patches: ordered.map((n, i) => ({ id: n.id, parentId: newParentId, order: i })) }
+}
+
+/** 应用移动补丁（更新 parentId 与 order） */
+export async function applyOutlineMove(patches: OutlineMovePatch[]): Promise<void> {
+  for (const p of patches) {
+    await outlineRepo.update(p.id, { parentId: p.parentId, order: p.order })
+  }
+}
+
 /** 简易 HTML → 纯文本（大纲节点核心剧情摘要用） */
 export function stripHtml(html: string): string {
   return html

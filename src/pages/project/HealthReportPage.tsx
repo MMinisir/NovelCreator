@@ -1,6 +1,9 @@
 import { useMemo } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRight, HeartPulse, Lightbulb, RefreshCw } from 'lucide-react'
+import { ArrowRight, HeartPulse, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
+import { useAITask } from '@/hooks/useAITask'
+import { loadAIConfig } from '@/services/ai/config'
+import { explainHealthReport } from '@/services/ai/tasks'
 import { Badge, Button, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -60,8 +63,14 @@ export default function HealthReportPage() {
     [characters, arcs, foreshadowings, events, chapters, locations, issues, project?.chapterDefaults.targetWords],
   )
 
+  const { loading: aiLoading, error: aiError, result: aiText, run, cancel } = useAITask<string>()
+
   function refreshAll() {
     void Promise.all([r1(), r2(), r3(), r4(), r5(), r6(), r7(), r8()])
+  }
+
+  async function handleAIExplain() {
+    await run((signal) => explainHealthReport({ projectName: project?.name ?? '', report }, loadAIConfig(), signal))
   }
 
   return (
@@ -73,10 +82,38 @@ export default function HealthReportPage() {
             {project?.name} · 伏笔回收 / 人物弧光 / 时间线连贯 / 设定一致性 / 章节进度 五维评分（实时计算）
           </p>
         </div>
-        <Button variant="secondary" onClick={refreshAll}>
-          <RefreshCw className="size-4" /> 重新生成
-        </Button>
+        <div className="flex items-center gap-2">
+          {aiLoading && (
+            <Button variant="ghost" onClick={cancel}>
+              停止
+            </Button>
+          )}
+          <Button variant="secondary" onClick={refreshAll}>
+            <RefreshCw className="size-4" /> 重新生成
+          </Button>
+          <Button variant="primary" loading={aiLoading} onClick={() => void handleAIExplain()}>
+            <Sparkles className="size-4" /> AI 解读
+          </Button>
+        </div>
       </div>
+
+      {aiError && <p className="mb-4 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{aiError}</p>}
+      {aiText && (
+        <section className="mb-6 rounded-2xl border border-violet-200 bg-violet-50/60 p-5">
+          <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
+            <Sparkles className="size-4" /> AI 解读（基于上方评分，仅供参考）
+          </div>
+          <div className="mt-2 space-y-2 text-sm leading-relaxed text-stone-700">
+            {aiText
+              .split(/\r?\n\s*\r?\n|\r?\n/)
+              .map((p) => p.trim())
+              .filter(Boolean)
+              .map((p, i) => (
+                <p key={i}>{p}</p>
+              ))}
+          </div>
+        </section>
+      )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         {/* 总分 */}
