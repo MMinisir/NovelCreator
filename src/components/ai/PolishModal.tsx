@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
-import { Check, Diff, Eye, Sparkles } from 'lucide-react'
+import { Check, ClipboardPaste, Diff, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea, cn } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { polishText, runCustomPrompt } from '@/services/ai/tasks'
 import { buildPolishPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
+import PasteImportModal from './PasteImportModal'
 import { diffLines, diffSummary } from '@/utils/diff'
 
 /** AI 润色选中文本（Sprint 9 US-806）：原文只读展示 + 结果可编辑 + 行差异对比，可一键替换选区 */
@@ -30,6 +31,7 @@ export default function PolishModal({
   const [showDiff, setShowDiff] = useState(false)
   const [note, setNote] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -48,6 +50,15 @@ export default function PolishModal({
     const trimmed = result.trim()
     setText(trimmed)
     if (!trimmed) setError('AI 返回内容为空，可调整润色方向后重试')
+  }
+
+  /** 粘贴在别处润色好的结果直接填充（可继续对比差异并替换选区） */
+  function handlePasteImport(text: string): string | null {
+    const t = text.trim()
+    if (!t) return '内容为空，请粘贴润色后的文本'
+    setText(t)
+    setError('')
+    return null
   }
 
   function handleApply() {
@@ -77,6 +88,9 @@ export default function PolishModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处润色好的结果直接填充">
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
             <Eye className="size-4" /> 提示预览
@@ -161,6 +175,15 @@ export default function PolishModal({
             setPreviewOpen(false)
             void handleGenerate({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="润色选中文本"
+          description="把在别处（其它 AI 工具）润色好的结果粘贴进来，可直接对比与原文的差异并替换选区。"
+          placeholder="粘贴润色后的完整文本…"
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </Modal>

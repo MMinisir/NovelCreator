@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { Eye, Sparkles } from 'lucide-react'
+import { ClipboardPaste, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { generateCharacterBioText, runCustomPrompt, textToHtmlParagraphs } from '@/services/ai/tasks'
 import { buildBioPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
+import PasteImportModal from './PasteImportModal'
 import type { Character } from '@/types'
 
 /** 人物小传生成器（Sprint 7 US-803）：基于已有设定生成小传，可编辑后写入背景故事 */
@@ -24,6 +25,7 @@ export default function CharacterBioModal({
   const [words, setWords] = useState(400)
   const [text, setText] = useState<string | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -45,6 +47,15 @@ export default function CharacterBioModal({
     if (!result.trim()) setError('AI 返回内容为空，可补充人物设定后重试')
   }
 
+  /** 粘贴在别处（其它 AI 工具/文档）写好的小传正文直接填充 */
+  function handlePasteImport(text: string): string | null {
+    const t = text.trim()
+    if (!t) return '内容为空，请粘贴小传正文'
+    setText(t)
+    setError('')
+    return null
+  }
+
   return (
     <Modal
       open
@@ -56,6 +67,9 @@ export default function CharacterBioModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成的小传正文直接填充">
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
             <Eye className="size-4" /> 提示预览
@@ -111,6 +125,15 @@ export default function CharacterBioModal({
             setPreviewOpen(false)
             void handleGenerate({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="人物小传"
+          description="把在别处（其它 AI 工具、文档）写好的小传正文粘贴进来，导入后仍可编辑并写入「背景故事」。"
+          placeholder="粘贴人物小传正文（空行分段，导入后自动转段落）…"
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </Modal>

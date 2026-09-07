@@ -1,12 +1,16 @@
 import { useState } from 'react'
-import { Eye, Sparkles } from 'lucide-react'
+import { ClipboardPaste, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { generateSynopsisText, parseSynopsis, runCustomPrompt } from '@/services/ai/tasks'
 import { buildSynopsisPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
+import PasteImportModal from './PasteImportModal'
 import { SYNOPSIS_PARTS, applySynopsis } from '@/services/outline'
+
+/** 示例文本：供「填入示例」演示解析效果 */
+const PASTE_EXAMPLE = SYNOPSIS_PARTS.map((p) => `${p}：一句话示例内容`).join('\n')
 import type { Character, Project } from '@/types'
 
 /** 五句话梗概生成器（Sprint 7 US-802）：输入设定 → AI 生成 → 可编辑 → 写入大纲 */
@@ -28,6 +32,7 @@ export default function SynopsisGeneratorModal({
   const [lines, setLines] = useState<string[] | null>(null)
   const [applying, setApplying] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const { loading, error, setError, run, cancel } = useAITask<string>()
 
   function buildContext(): string | undefined {
@@ -64,6 +69,17 @@ export default function SynopsisGeneratorModal({
     }
   }
 
+  /** 粘贴在别处生成好的五句话梗概直接填充（自动识别「开端：…」格式或按行顺序） */
+  function handlePasteImport(text: string): string | null {
+    const parsed = parseSynopsis(text)
+    if (parsed.every((l) => !l.trim())) {
+      return `未能识别出内容。请使用「${SYNOPSIS_PARTS[0]}：…」的形式，或每行一句、按 ${SYNOPSIS_PARTS.join(' → ')} 的顺序排列`
+    }
+    setLines(parsed)
+    setError('')
+    return null
+  }
+
   async function handleApply() {
     if (!lines) return
     setApplying(true)
@@ -86,6 +102,9 @@ export default function SynopsisGeneratorModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成好的梗概直接填充">
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
             <Eye className="size-4" /> 提示预览
@@ -164,6 +183,16 @@ export default function SynopsisGeneratorModal({
             setPreviewOpen(false)
             void handleGenerate({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="五句话梗概"
+          description="把在别处（其它 AI 工具、聊天记录）生成好的五句话梗概粘贴进来，自动拆分为可编辑的五句，再写入大纲。"
+          placeholder={`支持「${SYNOPSIS_PARTS[0]}：…」逐句前缀，或每行一句按顺序排列`}
+          example={PASTE_EXAMPLE}
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </Modal>

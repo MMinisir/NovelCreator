@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { CheckCircle2, ExternalLink, Eye, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
+import { CheckCircle2, ClipboardPaste, ExternalLink, Eye, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { parseDeepConsistencyIssues, runCustomPrompt, runDeepConsistencyCheck } from '@/services/ai/tasks'
 import { buildDeepConsistencyPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
+import PasteImportModal from '@/components/ai/PasteImportModal'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -47,6 +48,7 @@ export default function ConsistencyPage() {
   const [filter, setFilter] = useState<'all' | IssueLevel>('all')
   const [aiIssues, setAiIssues] = useState<ConsistencyIssue[]>([])
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<ConsistencyIssue[]>()
 
   const issues = useMemo(
@@ -90,6 +92,15 @@ export default function ConsistencyPage() {
     if (data) setAiIssues(data)
   }
 
+  /** 粘贴在别处生成好的问题清单 JSON 直接填充为 AI 检查结果 */
+  function handlePasteImport(text: string): string | null {
+    const list = parseDeepConsistencyIssues(text)
+    if (!list.length) return '未解析出任何问题条目，请粘贴符合格式的 JSON 数组'
+    setAiIssues(list)
+    setAiError('')
+    return null
+  }
+
   function refreshAll() {
     void Promise.all([
       refreshChars(),
@@ -117,6 +128,9 @@ export default function ConsistencyPage() {
               停止
             </Button>
           )}
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成好的问题清单直接填充">
+            <ClipboardPaste className="size-4" /> 粘贴填充
+          </Button>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
             <Eye className="size-4" /> 提示预览
           </Button>
@@ -195,6 +209,16 @@ export default function ConsistencyPage() {
             setPreviewOpen(false)
             void handleDeep({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="一致性深度检查"
+          description="把在别处生成好的问题清单 JSON 粘贴进来，直接加入结果列表（与规则引擎结果合并展示）。"
+          placeholder={'JSON 数组，每项含 level/category/title/detail，如 [{"level":"warn","category":"人物","title":"…","detail":"…"}]'}
+          example={`[\n  {"level":"warn","category":"人物","title":"苏晚重伤后仍出现在市集","detail":"第 12 章明确重伤昏迷，第 14 章又出现在市集，建议补过渡或改时间"},{"level":"info","category":"伏笔","title":"玉佩只埋未收","detail":"前 10 章两次强调玉佩，目前无回收迹象"}\n]`}
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </div>

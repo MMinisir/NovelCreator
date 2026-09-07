@@ -46,6 +46,7 @@
 | `services/ai/prompts.ts` | **提示构建层**：`SYSTEM_PROMPT`、`withSystem`、`buildXxxPrompt`（7 个任务）+ `AI_KIND_LABELS`；执行与「提示预览」共用同一构建函数，保证预览即所发 |
 | `services/ai/log.ts` | **AI 请求日志**：`startRequestLog`/`finishRequestLog`（记录完整 messages、响应、错误、耗时、模型）、`listRequestLogs`/`deleteRequestLog`/`clearRequestLogs`/`summarizeLogs`；存 IndexedDB `ai_request_logs`（db version 3），不随项目导出，随项目删除清理 |
 | `components/ai/PromptPreviewModal.tsx` | 提示预览：展示 system（可折叠）+ user（可编辑）、复制提示、「用此提示生成」（编辑仅本次生效，走 `runCustomPrompt`） |
+| `components/ai/PasteImportModal.tsx` | **粘贴填充（AI 写回）**：把别处生成的内容粘贴导入，复用各任务解析管线填为可编辑结果；props：`title/description/placeholder/example`（示例可一键填入）+ `onImport(text) => Promise<string\|null>|string\|null`（返回 null 成功自动关闭，返回文案则在弹窗内展示）；「读取剪贴板」用 `navigator.clipboard.readText`（失败提示手动粘贴）；不走内置 AI、不写请求日志 |
 | `pages/project/AIHistoryPage.tsx` | AI 请求历史页（路由 `/projects/:id/ai-log`，侧栏「AI 请求」）：统计 + 列表 + 展开看完整提示/响应/错误、复制、删除、清空本项目 |
 | `components/ai/CharacterCardModal.tsx` | **一句话生成角色卡**：设定输入 → AI 产出结构化字段 → 表单逐项编辑 → `characterRepo.add` 创建人物并跳转详情（纯文本字段经 `textToHtmlParagraphs` 转富文本） |
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
@@ -131,7 +132,13 @@
 
 ## 8. 最近变更
 
-### 本轮（提示预览 + AI 请求留痕与历史页）
+### 本轮（AI 粘贴填充写回）
+- 新增：`components/ai/PasteImportModal.tsx`（通用粘贴导入弹窗）。
+- 7 个 AI 入口（梗概/小传/关系建议/润色/一致性深度检查/体检解读/角色卡）的按钮区新增「粘贴填充」（与「AI 生成」「提示预览」并列），粘贴别处生成的内容 → 复用各自解析管线填为可编辑结果后照常落库：梗概自动拆五句（parseSynopsis）、角色卡/关系建议/深度检查解析 JSON（parseCharacterCard/parseRelationshipSuggestions/parseDeepConsistencyIssues，错误留在弹窗内可改后重试）、小传/润色/体检解读直接填充文本。
+- 关系建议/深度检查/角色卡弹窗提供「填入示例」演示解析效果；梗概支持「开端：…」前缀或顺序无前缀两种格式。
+- 粘贴不走内置 AI：不消耗 API、不写 ai_request_logs。
+
+### 上轮（提示预览 + AI 请求留痕与历史页）
 - 新增：`services/ai/prompts.ts`（提示构建层）、`services/ai/log.ts`（请求日志）、`components/ai/PromptPreviewModal.tsx`、`pages/project/AIHistoryPage.tsx`；db 升到 version 3 新增 `ai_request_logs` 表（`id, projectId, kind, createdAt`）。
 - 重构：`services/ai/tasks.ts` 的 7 个任务改为「prompts.ts 构建提示 → runPrompt(带 meta) 执行并留痕」，新增 `runCustomPrompt`（供预览编辑后生成）；各任务 input 增加可选 `projectId` 用于日志归类。
 - 接线：五句话梗概、人物小传、关系建议、润色、一致性深度检查、体检解读、角色卡 7 个入口全部增加「提示预览」（查看/编辑/复制/用此提示生成）；侧栏新增「AI 请求」历史页。

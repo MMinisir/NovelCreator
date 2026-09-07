@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowRight, Eye, HeartPulse, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
+import { ArrowRight, ClipboardPaste, Eye, HeartPulse, Lightbulb, RefreshCw, Sparkles } from 'lucide-react'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import { explainHealthReport, runCustomPrompt } from '@/services/ai/tasks'
 import { buildHealthExplainPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from '@/components/ai/PromptPreviewModal'
+import PasteImportModal from '@/components/ai/PasteImportModal'
 import { Badge, Button, cn } from '@/components/ui'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
@@ -65,8 +66,10 @@ export default function HealthReportPage() {
     [characters, arcs, foreshadowings, events, chapters, locations, issues, project?.chapterDefaults.targetWords],
   )
 
-  const { loading: aiLoading, error: aiError, result: aiText, run, cancel } = useAITask<string>()
+  const { loading: aiLoading, error: aiError, result: aiText, setResult, setError: setAiError, run, cancel } =
+    useAITask<string>()
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
 
   function refreshAll() {
     void Promise.all([r1(), r2(), r3(), r4(), r5(), r6(), r7(), r8()])
@@ -90,6 +93,15 @@ export default function HealthReportPage() {
     )
   }
 
+  /** 粘贴在别处生成的解读文字直接展示 */
+  function handlePasteImport(text: string): string | null {
+    const t = text.trim()
+    if (!t) return '内容为空，请粘贴解读文字'
+    setResult(t)
+    setAiError('')
+    return null
+  }
+
   return (
     <div>
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -107,6 +119,9 @@ export default function HealthReportPage() {
           )}
           <Button variant="secondary" onClick={refreshAll}>
             <RefreshCw className="size-4" /> 重新生成
+          </Button>
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成的解读文字直接展示">
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button variant="ghost" onClick={() => setPreviewOpen(true)} title="查看并编辑将要发送的提示">
             <Eye className="size-4" /> 提示预览
@@ -218,6 +233,15 @@ export default function HealthReportPage() {
             setPreviewOpen(false)
             void handleAIExplain({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="体检报告解读"
+          description="把在别处（其它 AI 工具）生成的解读文字粘贴进来直接展示与复制。"
+          placeholder="粘贴解读文字（建议一段总体诊断 + 优先处理事项 + 下一步）…"
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </div>

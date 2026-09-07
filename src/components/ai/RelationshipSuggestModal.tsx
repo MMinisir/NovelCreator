@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Eye, Sparkles } from 'lucide-react'
+import { ClipboardPaste, Eye, Sparkles } from 'lucide-react'
 import { Badge, Button, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
@@ -11,6 +11,7 @@ import {
 } from '@/services/ai/tasks'
 import { buildRelationshipPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
+import PasteImportModal from './PasteImportModal'
 import { relationshipRepo } from '@/db/repositories'
 import { createEntity } from '@/utils/common'
 import type { Character, Relationship } from '@/types'
@@ -37,7 +38,8 @@ export default function RelationshipSuggestModal({
   const [checked, setChecked] = useState<Record<number, boolean>>({})
   const [saving, setSaving] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const { loading, error, result, run, cancel } = useAITask<RelationshipSuggestion[]>()
+  const [pasteOpen, setPasteOpen] = useState(false)
+  const { loading, error, result, setResult, setError, run, cancel } = useAITask<RelationshipSuggestion[]>()
 
   /** 已存在关系对（无方向，按 id 排序归一） */
   const existing = useMemo(() => {
@@ -49,6 +51,25 @@ export default function RelationshipSuggestModal({
   function isDup(s: RelationshipSuggestion): boolean {
     if (!s.sourceId || !s.targetId) return false
     return existing.has([s.sourceId, s.targetId].sort().join('|'))
+  }
+
+  /** 粘贴在别处生成好的关系建议 JSON 直接填充为可勾选列表 */
+  async function handlePasteImport(text: string): Promise<string | null> {
+    let list: RelationshipSuggestion[]
+    try {
+      list = parseRelationshipSuggestions(text, characters)
+    } catch (err) {
+      return err instanceof Error ? err.message : 'JSON 解析失败'
+    }
+    if (!list.length) return '未解析出任何关系条目，请粘贴符合格式的 JSON 数组'
+    setError('')
+    setResult(list)
+    const next: Record<number, boolean> = {}
+    list.forEach((s, i) => {
+      next[i] = !s.disabled && !isDup(s)
+    })
+    setChecked(next)
+    return null
   }
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -119,6 +140,13 @@ export default function RelationshipSuggestModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button
+            variant="ghost"
+            onClick={() => setPasteOpen(true)}
+            title="粘贴在别处生成好的关系建议直接填充"
+          >
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button
             variant="ghost"
@@ -227,6 +255,16 @@ export default function RelationshipSuggestModal({
             setPreviewOpen(false)
             void handleGenerate({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="人物关系建议"
+          description="把在别处生成好的关系候选 JSON 粘贴进来，导入后勾选采纳（与已存在的关系自动去重）。"
+          placeholder={'JSON 数组，每项含 source/target/type/strength/reason，如 [{"source":"人物A","target":"人物B","type":"敌对","strength":-60,"reason":"…"}]'}
+          example={`[\n  {"source":"人物A","target":"人物B","type":"敌对","strength":-60,"reason":"为夺同一秘宝结怨"},\n  {"source":"人物C","target":"人物D","type":"师徒","strength":80,"reason":"故人之托"}\n]`}
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </Modal>

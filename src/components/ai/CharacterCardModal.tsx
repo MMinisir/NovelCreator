@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, Eye, Sparkles } from 'lucide-react'
+import { Check, ClipboardPaste, Eye, Sparkles } from 'lucide-react'
 import { Button, Field, Input, Modal, Select, Textarea } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { characterRepo } from '@/db/repositories'
@@ -13,6 +13,7 @@ import {
 } from '@/services/ai/tasks'
 import { buildCharacterCardPrompt, withSystem } from '@/services/ai/prompts'
 import PromptPreviewModal from './PromptPreviewModal'
+import PasteImportModal from './PasteImportModal'
 import { createEntity } from '@/utils/common'
 import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character } from '@/types'
 
@@ -43,6 +44,7 @@ export default function CharacterCardModal({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [pasteOpen, setPasteOpen] = useState(false)
   const { loading, error: aiError, setError: setAiError, run, cancel } = useAITask<CharacterCardDraft>()
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
@@ -70,6 +72,19 @@ export default function CharacterCardModal({
           ),
         )
     if (data) setDraft(data)
+  }
+
+  /** 粘贴在别处生成好的角色卡 JSON 直接填充为可编辑草稿 */
+  async function handlePasteImport(text: string): Promise<string | null> {
+    try {
+      const data = parseCharacterCard(text)
+      if (!data.name.trim()) return '解析出的角色卡缺少姓名，请补充后重试'
+      setDraft(data)
+      setAiError('')
+      return null
+    } catch (err) {
+      return err instanceof Error ? err.message : '角色卡 JSON 解析失败'
+    }
   }
 
   function update<K extends keyof CharacterCardDraft>(key: K, value: CharacterCardDraft[K]) {
@@ -122,6 +137,9 @@ export default function CharacterCardModal({
         <>
           <Button variant="ghost" onClick={onClose}>
             取消
+          </Button>
+          <Button variant="ghost" onClick={() => setPasteOpen(true)} title="粘贴在别处生成好的角色卡直接填充">
+            <ClipboardPaste className="size-4" /> 粘贴填充
           </Button>
           <Button
             variant="ghost"
@@ -251,6 +269,16 @@ export default function CharacterCardModal({
             setPreviewOpen(false)
             void handleGenerate({ userText, systemText })
           }}
+        />
+      )}
+      {pasteOpen && (
+        <PasteImportModal
+          title="一句话角色卡"
+          description="把在别处生成好的角色卡 JSON 粘贴进来，导入为可逐项编辑的草稿后即可创建人物。"
+          placeholder='JSON 角色卡，含 name/aliases/importance/personalityTags/desire/flaw/background 等字段'
+          example={`{"name":"沈观鱼","aliases":["白鹮"] ,"importance":"protagonist","gender":"男","age":"27","appearance":"清瘦高挑，惯穿洗得发白的旧袍，左手常年缠着绷带。","personalityTags":["谨慎","记仇","重诺"],"desire":"查明当年师门覆灭的真相","flaw":"一旦涉及旧事便失去冷静","background":"出身医修世家，幼年随师门避世于东海孤岛，十七岁那年一夜之间师门尽灭，唯他生还。","abilities":["针灸封脉","岐黄问诊","易容"],"currentState":"流落临安城，以行医换消息"}`}
+          onImport={(t) => handlePasteImport(t)}
+          onClose={() => setPasteOpen(false)}
         />
       )}
     </Modal>
