@@ -30,6 +30,10 @@
 | `utils/eventTypes.ts` | 共享事件类型与配色（EVENT_TYPES / EVENT_TYPE_STYLE，事件页+时间线复用） |
 | `utils/timeline.ts` | 时间线领域纯函数：TimelineItem 构建/排序（kind=event/state/foreshadow，US-602 伏笔按预期回收事件锚定）、manualKindOf、段归一 normalizeManualSegment/needsManualNormalize、swapManualNeighbors |
 | `utils/markdown.ts` | **Markdown 导出（US-701）**：`htmlToMarkdown`（TipTap HTML 受控子集→md，纯函数）+ `chaptersToMarkdown` 组装（头部元信息+按写作顺序章节） |
+| `utils/diff.ts` | **行级差异对比（US-504）**：自实现 LCS（公共前后缀裁剪 + >1200 行退化），`htmlToTextLines` / `diffLines` / `diffSummary` |
+| `services/chapterVersions.ts` | 章节版本历史（US-504）：`autoSnapshot`（内容变化且距上条自动版本 ≥2 分钟才写，自动版本保留 50 条）、`saveManualVersion`（带 label 里程碑）、`restoreVersion`（回滚前先把当前正文存为里程碑） |
+| `services/consistency.ts` | **一致性检查规则引擎（US-805 规则版）**：`runConsistencyChecks` 纯函数输出 Issue 列表（人物/关系/地点/事件/伏笔/章节/大纲 七类规则）+ `summarizeIssues` |
+| `components/writing/` | `ChapterVersionModal`（版本列表+差异+回滚）、`ReferencePanel`（US-501b/505 分屏参考：细纲/人物/地点/伏笔/关键事件） |
 | `pages/ProjectListPage.tsx` | 首页项目列表 |
 | `pages/project/ProjectWorkspace.tsx` | 项目内布局 + 侧栏模块导航（设置 URL: `/projects/:id/xxx`） |
 | `pages/project/*Page.tsx` | Characters/Locations/Events/Outline/Writing/CharacterDetail/Overview/Settings/Timeline/Graph/**Foreshadowings**/Ideas/ModulePlaceholder（兜底） |
@@ -65,13 +69,16 @@
 | 5 | 时间线 react-window（US-301~304）+ AI Provider 预研 | ✅（本轮） |
 | 6 | 伏笔管理（US-601/602）、导出 Markdown（US-701）、PWA 速记（US-901） | ✅（本轮） |
 | 7 | AI 功能开放（US-801~804）、自动备份（US-702/703） | ✅（本轮） |
-| 8 | 一致性/写作辅助/版本历史（US-501b,504,505,805） | 规划 |
+| 8 | 一致性/写作辅助/版本历史（US-501b,504,505,805） | ✅（本轮） |
 | 9 | AI 审稿与移动端（US-806,805-LLM,902,903） | 规划 |
 | 10 | 协作批注、DOCX/PDF 导出、体检报告（US-1001,701,新增） | 规划 |
 
 ## 6. 核心约定 / 待办（决策记录）
 
 - **US-205 大纲拖拽排序** → 待办（树组件行尾已预留）。
+- **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
+- **分屏参考（US-501b/505 已交付）**：写作区头部「分屏参考」开关，左面板展示本章关联设定——细纲概要、出场人物（含当前状态；细纲未标记时按正文提及人物名/别名兜底匹配）、地点（细纲 scene.locationId 或正文提及）、伏笔（本章埋设/回收 + 其它待回收提醒）、关键事件（细纲 keyEventIds）。
+- **一致性检查（US-805 规则引擎版已交付）**：路由 `/projects/:id/consistency`（侧栏「一致性检查」）。`services/consistency.ts` 纯函数规则：主角缺失、人物缺标签/欲望缺陷/当前状态、关系指向已删人物（error）、主要人物孤立、地点无描述、事件无时间/无参与者/引用不存在人物（error）、活跃伏笔无预期回收锚点（warn）、伏笔状态与大纲回收标记不一致（error）、活跃超 30 天、章节无正文/完成章字数不足目标 50%（warn）、大纲无分幕、细纲未展开正文。LLM 语义检查 Sprint 9 增强（页面顶部已注明）。
 - **时间线（Sprint 5+6 已交付）**：路由 `/projects/:id/timeline`（TimelinePage）。全局=全部事件；顶部 Select 选人=角色时间线（该人物事件+`CharacterState` 状态变化合并）。筛选=人物/地点/类型 chips + **「伏笔节点」开关（US-602，sky 色节点）**。排序=compareFlexibleTime 类别段内序；**模糊/相对事件行右侧 ▲▼ 在同类段内移动**（写 `time.sortOrder`，首次移动自动归一 0..n-1）。虚拟滚动=react-window v2 `List`。事件编辑仍在事件页。
 - **伏笔管理（Sprint 6 已交付）**：路由 `/projects/:id/foreshadowing`（ForeshadowingsPage）。列表状态筛选（全部/活跃/已回收/已废弃）+ 优先级/预期回收事件/相关人物展示；新建/编辑 Modal（描述必填；**预期回收事件**锚到事件 → 时间线节点）；删除走 `deleteForeshadowingCascade`（自动解除全部大纲节点 planted/resolved 引用）。大纲节点侧（OutlineNodeEditor）埋设/回收闭环仍可用。
 - **Markdown 导出（US-701）**：写作页头部「导出 Markdown」→ `chaptersToMarkdown` 组装（# 作品名 + 元信息 + 按顺序各章 `## 标题` + 状态/字数 + htmlToMarkdown 正文）。htmlToMarkdown 支持子集：h1-6/p/strong/em/code/s/del/a/br/img/blockquote/ul/ol(嵌套)/hr/pre。DOCX/PDF 留 Sprint 10。
@@ -97,7 +104,12 @@
 
 ## 8. 最近变更
 
-### Sprint 7（本轮）
+### Sprint 8（本轮）
+- 新增：`utils/diff.ts`、`services/chapterVersions.ts`、`services/consistency.ts`、`components/writing/{ChapterVersionModal,ReferencePanel}.tsx`、`pages/project/ConsistencyPage.tsx`。
+- 修改：`WritingPage` 接入自动快照（flush 后）+「版本历史」按钮 +「分屏参考」开关与左参考面板；`App.tsx` 注册 `consistency` 路由；`ProjectWorkspace` 侧栏加「一致性检查」。
+- Sprint 8 验收：写作时可开关分屏参考看到本章关联人物/地点/伏笔；停笔自动保存产生版本，版本弹窗可看行差异并回滚；一致性检查页按错误/警告/提示统计并列出问题，可一键跳转处理。
+
+### Sprint 7（历史）
 - 新增：`services/ai/config.ts`（配置 localStorage + 4 个服务商预设）、`services/ai/tasks.ts`（US-802~804 生成与结果解析）、`services/backup.ts`（FSA 目录/AES-GCM 加密/写入与恢复）、`components/ai/{AIConfigPanel,SynopsisGeneratorModal,CharacterBioModal,RelationshipSuggestModal}.tsx`、`components/backup/BackupPanel.tsx`、`hooks/{useAITask,useAutoBackup}.ts`。
 - 修改：`types/meta.ts` 增 `BackupSettings`；`db/database.ts` 增 **version(2)** 表 `backup_settings`（DB_VERSION 仍 1）；`db/repositories.ts` 增 `loadBackupSettings/saveBackupSettings`；`services/outline.ts` 增 `applySynopsis`；`ProjectSettingsPage` 底部接入 AI 配置与备份面板；`OutlinePage`/`CharacterDetailPage`/`RelationshipGraphPage` 各增 AI 入口；`ProjectWorkspace` 挂 `useAutoBackup`。
 - Sprint 7 验收：项目设置页可保存 AI 配置并测试连接；大纲页 AI 生成五句话可编辑写入；人物详情页 AI 生成小传写入背景故事；关系图 AI 建议可勾选采纳（去重/归一）；备份面板可选目录、立即备份、加密口令、从备份文件恢复为副本。

@@ -15,6 +15,7 @@ import RelationshipGraphPage from '@/pages/project/RelationshipGraphPage'
 import TimelinePage from '@/pages/project/TimelinePage'
 import ForeshadowingsPage from '@/pages/project/ForeshadowingsPage'
 import IdeasPage from '@/pages/project/IdeasPage'
+import ConsistencyPage from '@/pages/project/ConsistencyPage'
 
 /** 路由结构（设计文档 §6.1 导航：项目 -> 人物/地点/事件/大纲/时间线/关系图/伏笔/写作/灵感/设置） */
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="timeline" element={<TimelinePage />} />
           <Route path="foreshadowing" element={<ForeshadowingsPage />} />
           <Route path="ideas" element={<IdeasPage />} />
+          <Route path="consistency" element={<ConsistencyPage />} />
           <Route path="settings" element={<ProjectSettingsPage />} />
           <Route path=":module" element={<ModulePlaceholderPage />} />
         </Route>

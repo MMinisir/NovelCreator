@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { CheckCircle2, Download, FileText, PenLine, Plus, Target, Trash2 } from 'lucide-react'
+import { CheckCircle2, Columns2, Download, FileText, History, PenLine, Plus, Target, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, cn } from '@/components/ui'
-import { chapterRepo, deleteChapterCascade, outlineRepo } from '@/db/repositories'
+import { characterRepo, chapterRepo, deleteChapterCascade, eventRepo, foreshadowingRepo, locationRepo, outlineRepo } from '@/db/repositories'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
 import { createEntity, downloadTextFile } from '@/utils/common'
 import { chaptersToMarkdown } from '@/utils/markdown'
+import ChapterVersionModal from '@/components/writing/ChapterVersionModal'
+import ReferencePanel from '@/components/writing/ReferencePanel'
+import { autoSnapshot } from '@/services/chapterVersions'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import { CHAPTER_STATUS_LABELS } from '@/types/chapter'
@@ -27,7 +30,12 @@ export default function WritingPage() {
   const project = useProjectStore((s) => s.currentProject())
   const { items: chapters, loaded, refresh } = useProjectEntityList(chapterRepo, projectId)
   const { items: outlineNodes } = useProjectEntityList(outlineRepo, projectId)
+  const { items: characters } = useProjectEntityList(characterRepo, projectId)
+  const { items: locations } = useProjectEntityList(locationRepo, projectId)
+  const { items: events } = useProjectEntityList(eventRepo, projectId)
+  const { items: foreshadowings } = useProjectEntityList(foreshadowingRepo, projectId)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [showReference, setShowReference] = useState(false) // US-501b 分屏参考面板
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<Chapter | null>(null)
 
@@ -90,6 +98,13 @@ export default function WritingPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            variant={showReference ? 'primary' : 'secondary'}
+            onClick={() => setShowReference((v) => !v)}
+            title="开关左侧参考面板（人物/地点/伏笔/细纲）"
+          >
+            <Columns2 className="size-4" /> 分屏参考
+          </Button>
+          <Button
             variant="secondary"
             onClick={handleExport}
             disabled={!loaded || sorted.length === 0}
@@ -145,16 +160,30 @@ export default function WritingPage() {
             )}
           </aside>
 
-          {/* 编辑器区 */}
+          {/* 编辑器区（US-501b：开启分屏时左侧参考面板 + 右侧正文） */}
           <main className="min-w-0 flex-1">
             {selected ? (
-              <ChapterEditor
-                key={selected.id}
-                chapter={selected}
-                targetWords={selected.targetWords ?? project?.chapterDefaults.targetWords}
-                onChanged={() => void refresh()}
-                onDelete={() => setDeleting(selected)}
-              />
+              <div className={cn('flex items-start gap-4', showReference && 'flex-col lg:flex-row')}>
+                {showReference && (
+                  <ReferencePanel
+                    chapter={selected}
+                    outlineNodes={outlineNodes}
+                    characters={characters}
+                    locations={locations}
+                    events={events}
+                    foreshadowings={foreshadowings}
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <ChapterEditor
+                    key={selected.id}
+                    chapter={selected}
+                    targetWords={selected.targetWords ?? project?.chapterDefaults.targetWords}
+                    onChanged={() => void refresh()}
+                    onDelete={() => setDeleting(selected)}
+                  />
+                </div>
+              </div>
             ) : (
               <EmptyState
                 icon={<PenLine className="size-6" />}
@@ -290,6 +319,7 @@ function ChapterEditor({
   const [html, setHtml] = useState(chapter.content)
   const [saving, setSaving] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [versionOpen, setVersionOpen] = useState(false) // US-504 版本历史
   const wordCount = useMemo(() => countWords(html), [html])
 
   const htmlRef = useRef(html)
@@ -317,6 +347,8 @@ function ChapterEditor({
         statusRef.current = nextStatus
       }
       await chapterRepo.update(cur.id, patch)
+      // US-504：保存后写入自动快照（内部按内容变化与最小间隔节流）
+      void autoSnapshot({ ...cur, content, wordCount: words })
       setSavedAt(new Date().toLocaleTimeString('zh-CN', { hour12: false }))
       onChanged()
     } finally {
@@ -383,6 +415,9 @@ function ChapterEditor({
               <option key={s} value={s}>{CHAPTER_STATUS_LABELS[s]}</option>
             ))}
           </Select>
+          <Button size="sm" variant="ghost" onClick={() => setVersionOpen(true)} title="版本历史（US-504）">
+            <History className="size-3.5" />
+          </Button>
           <Button size="sm" variant="ghost" onClick={onDelete}>
             <Trash2 className="size-3.5 text-red-500" />
           </Button>
@@ -415,6 +450,18 @@ function ChapterEditor({
         minHeight="min-h-[62vh]"
       />
       <p className="mt-2 text-right text-xs text-stone-300">停笔 1.5 秒后自动保存至浏览器本地</p>
+
+      {versionOpen && (
+        <ChapterVersionModal
+          chapter={chapter}
+          onClose={() => setVersionOpen(false)}
+          onRestored={(content) => {
+            setHtml(content)
+            setVersionOpen(false)
+            onChanged()
+          }}
+        />
+      )}
     </div>
   )
 }

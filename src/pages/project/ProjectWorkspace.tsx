@@ -13,6 +13,7 @@ import {
   PenLine,
   Settings,
   Share2,
+  ShieldCheck,
   Users,
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
@@ -30,6 +31,7 @@ const MODULES = [
   { path: 'foreshadowing', label: '伏笔', icon: Flag },
   { path: 'writing', label: '写作区', icon: PenLine },
   { path: 'ideas', label: '灵感碎片', icon: Lightbulb },
+  { path: 'consistency', label: '一致性检查', icon: ShieldCheck },
   { path: 'settings', label: '项目设置', icon: Settings },
 ]
 
