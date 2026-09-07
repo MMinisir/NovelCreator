@@ -43,6 +43,7 @@
 | `services/merge.ts` | **共享合并（US-1002）**：`buildMergePlan`（本地 vs 远端 JSON 实体级差异：added/changed/localNewer/removed + 差异字段）、`applyMergePlan`（远端行写入时覆盖 projectId）、`defaultSelection` |
 | `components/settings/MergeWizardModal.tsx` | 合并向导：按实体类型分组勾选差异（默认勾选远端新增/更新），全选/清空、合并计数 |
 | `services/exportDoc.ts` | **导出扩展（US-701）**：`exportChaptersDocx`（动态 import `docx` 库，独立 chunk）、`chaptersToPrintHtml`+`printHtml`（打印对话框另存 PDF，A4 排版） |
+| `components/ai/CharacterCardModal.tsx` | **一句话生成角色卡**：设定输入 → AI 产出结构化字段 → 表单逐项编辑 → `characterRepo.add` 创建人物并跳转详情（纯文本字段经 `textToHtmlParagraphs` 转富文本） |
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
 | `components/rich/RichTextEditor.tsx` | 新增选区 API：`EditorSelection`、`RichTextEditorAPI`（getSelection/replaceSelectionWithText）、`RichTextEditorAPIRef`（普通对象避开 React19 RefObject 只读 current）；`onSelectionUpdate` 上报选区、`onSelectionChange` 回调 |
 | `pages/ProjectListPage.tsx` | 首页项目列表 |
@@ -89,6 +90,7 @@
 
 - **US-205 大纲拖拽排序（已交付）**：大纲树行整行可拖拽，行上缘 28%=插入到目标之前、下缘 28%=之后、中部=成为目标子节点；`computeOutlineMove` 防环（不能拖到自己后代下）+ 层级约束（`allowedChildTypes`：root→act/free、act→chapter/free/act、chapter→scene/free、scene→无子），非法放置给中文提示条；order 在目标同级内归一 0..n-1 后批量 `outlineRepo.update`。
 - **US-1002 共享合并（已交付，执行案外）**：项目设置页「协作与合并」→ 选择外部导出的项目 JSON → `buildMergePlan` 按实体 id 比对 12 张表，分「远端新增 / 远端更新 / 本地更新 / 远端缺失」四类（含差异字段名与两端时间戳），向导默认只勾选远端新增与远端更新，应用时远端行 `projectId` 覆盖为当前项目；「远端缺失」勾选会删除本地记录，需手动确认。
+- **一句话生成角色卡（已交付）**：人物页「AI 生成角色卡」→ 输入一句话设定（可加补充要求）→ `generateCharacterCard` 让模型输出固定 JSON（含 name/aliases/importance/gender/age/appearance/personalityTags/desire/flaw/background/abilities/notes/currentState），`parseCharacterCard` 容错解析后填入可编辑表单，确认后创建人物并进入详情页。生成上下文自动带项目 `genre`、世界观 `worldSetting.freeText`+tags、已有人物名（提示避免重名）。`currentState` 落库为 `{ time:{type:'fuzzy',value:'初始'}, state }`；外貌/背景/备注经 `textToHtmlParagraphs` 存为富文本。
 - **全局搜索（已完善）**：顶栏入口 + `⌘K/Ctrl K` 快捷键；`services/search.ts` 纯函数计算（数据由面板打开时按需加载，关闭即释放，不全量常驻）。搜索范围默认当前项目，可切「全部项目」。结果按 `score` 排序：权重（项目名 6/名称标题 5/别名标签 3/正文 1）+ 命中位置（越靠前越高）。跳转：人物→人物详情页、章节→写作区 `?chapter=id`、批注→对应章节写作区，其余→对应模块列表页。
 - **体检报告 AI 解读（已交付）**：体检页「AI 解读」把总分/等级/五维摘要/系统建议交给 LLM，输出总体诊断 + 优先事项 + 下一步（需先配置 AI 服务）。
 - **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
@@ -124,7 +126,12 @@
 
 ## 8. 最近变更
 
-### 本轮（全局搜索完善）
+### 本轮（一句话生成角色卡）
+- 新增：`components/ai/CharacterCardModal.tsx`；`services/ai/tasks.ts` 增 `generateCharacterCard` / `parseCharacterCard`（`CharacterCardDraft`）。
+- 修改：`CharactersPage` 头部增「AI 生成角色卡」按钮，创建成功后刷新列表并跳转人物详情。
+- 能力：一句话设定（+ 可选补充要求）→ AI 输出姓名/别名/重要度/性别/年龄/性格标签/核心欲望/致命缺陷/能力/外貌/背景故事/当前状态/备注；解析容错（```json 包裹、数组↔字符串互转、重要度白名单兜底 supporting）；生成后全部字段可编辑；上下文自动带入项目题材、世界观自由文本与已有人物名（避免重名）。
+
+### 上一轮（全局搜索完善）
 - 新增：`services/search.ts`、`components/search/GlobalSearchModal.tsx`；`AppLayout` 顶栏搜索框由「开发中」占位改为可用入口（桌面搜索框带 `⌘K/Ctrl K` 提示，小屏折叠为图标按钮），并注册 `Cmd/Ctrl+K` 全局快捷键。
 - 能力：跨 9 类实体搜索（人物含别名/标签/欲望/缺陷/背景/当前状态，章节含正文纯文本，另有项目/地点/事件/伏笔/灵感/大纲/批注）；字段权重打分（名称 5 > 别名/标签 3 > 正文 1，命中位置靠前加分），同实体保留最佳字段命中；结果带类型徽标、命中字段、高亮片段；当前项目 / 全部项目范围切换；键盘 ↑↓ + Enter 打开 + Esc 关闭，选中项自动滚入可视区。
 

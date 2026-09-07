@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { AtSign, Plus, Search, Users } from 'lucide-react'
+import { AtSign, Plus, Search, Sparkles, Users } from 'lucide-react'
 import { Badge, Button, EmptyState, Field, Input, Modal, Select } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -10,6 +10,7 @@ import { IMPORTANCE_LABELS, IMPORTANCE_LEVELS, type Character, type ImportanceLe
 import { timeLabel } from '@/utils/time'
 import { cn } from '@/components/ui'
 import { QuickCreateCharacterModal } from '@/components/people/QuickCreateCharacterModal'
+import CharacterCardModal from '@/components/ai/CharacterCardModal'
 
 const IMPORTANCE_STYLE: Record<ImportanceLevel, string> = {
   protagonist: 'bg-violet-600 text-white',
@@ -28,6 +29,7 @@ export default function CharactersPage() {
   const [impFilter, setImpFilter] = useState<ImportanceLevel | 'all'>('all')
   const [creating, setCreating] = useState(false)
   const [quick, setQuick] = useState(false)
+  const [aiCard, setAiCard] = useState(false) // 一句话生成角色卡
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -51,6 +53,9 @@ export default function CharactersPage() {
         <div className="flex items-center gap-2">
           <Button variant="subtle" onClick={() => setQuick(true)}>
             <AtSign className="size-4" /> 快速建人
+          </Button>
+          <Button variant="subtle" onClick={() => setAiCard(true)}>
+            <Sparkles className="size-4" /> AI 生成角色卡
           </Button>
           <Button variant="primary" onClick={() => setCreating(true)}>
             <Plus className="size-4" /> 新建人物
@@ -170,6 +175,26 @@ export default function CharactersPage() {
             navigate(id)
           }}
           onDirty={() => void refresh()}
+        />
+      )}
+      {aiCard && projectId && (
+        <CharacterCardModal
+          projectId={projectId}
+          genre={currentProject?.genre}
+          projectContext={[
+            currentProject?.tagline ?? '',
+            currentProject?.worldSetting?.freeText ?? '',
+            currentProject?.worldSetting?.tags?.length ? `设定标签：${currentProject.worldSetting.tags.join('、')}` : '',
+          ]
+            .filter(Boolean)
+            .join('\n')}
+          existingNames={characters.map((c) => c.name)}
+          onClose={() => setAiCard(false)}
+          onCreated={(id) => {
+            setAiCard(false)
+            void refresh()
+            navigate(id)
+          }}
         />
       )}
       {creating && (

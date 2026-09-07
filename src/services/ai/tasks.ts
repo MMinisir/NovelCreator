@@ -347,6 +347,120 @@ export function parseDeepConsistencyIssues(text: string): ConsistencyIssue[] {
   return out
 }
 
+/* ---------------- 一句话生成角色卡 ---------------- */
+
+export interface CharacterCardDraft {
+  name: string
+  aliases: string[]
+  importance: 'protagonist' | 'major' | 'supporting' | 'minor'
+  gender?: string
+  age?: string
+  appearance?: string
+  personalityTags: string[]
+  desire?: string
+  flaw?: string
+  background?: string
+  abilities: string[]
+  notes?: string
+  /** 当前状态一句话（落库为 currentState.state） */
+  currentState?: string
+}
+
+/** 依据作者的一句话设定生成完整角色卡（结构化字段，UI 可再编辑后落库） */
+export async function generateCharacterCard(
+  input: {
+    prompt: string
+    genre?: string
+    worldContext?: string
+    existingNames?: string[]
+    extra?: string
+  },
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+): Promise<CharacterCardDraft> {
+  const lines = [
+    `请根据作者的一句话设定，生成一份完整、可直接投入创作的小说角色卡。`,
+    `只输出 JSON 对象（不要代码块、不要任何解释文字），字段与含义如下：`,
+    `{`,
+    `  "name": "姓名",`,
+    `  "aliases": ["别名/称号，可为空数组"],`,
+    `  "importance": "protagonist | major | supporting | minor 之一",`,
+    `  "gender": "性别（可空字符串）",`,
+    `  "age": "年龄（可模糊，如 外表18岁、实际300岁）",`,
+    `  "appearance": "外貌与气质描写，80 字内",`,
+    `  "personalityTags": ["3-5 个性格标签"],`,
+    `  "desire": "核心欲望，一句话",`,
+    `  "flaw": "致命缺陷，一句话",`,
+    `  "background": "背景故事，150-250 字，段落之间用 \\n 分隔",`,
+    `  "abilities": ["能力/技能/专长"],`,
+    `  "notes": "给作者的备注：戏份定位与可能的弧光方向（可空）",`,
+    `  "currentState": "当前状态，一句话，如 初入宗门的外门弟子"`,
+    `}`,
+    ``,
+    `要求：与设定自洽；欲望与缺陷形成张力；避免脸谱化与空洞形容词；全部简体中文。`,
+    ``,
+    `【作者的一句话设定】`,
+    input.prompt.trim(),
+  ]
+  if (input.genre?.trim()) lines.push(``, `【题材/类型】${input.genre.trim()}`)
+  if (input.worldContext?.trim()) lines.push(``, `【世界观参考】`, input.worldContext.trim().slice(0, 1500))
+  if (input.existingNames?.length) lines.push(``, `【已有人物（不要重名，可与之建立关联）】${input.existingNames.join('、')}`)
+  if (input.extra?.trim()) lines.push(``, `【补充要求】${input.extra.trim()}`)
+
+  const text = await runPrompt(config, [{ role: 'user', content: lines.join('\n') }], signal)
+  return parseCharacterCard(text)
+}
+
+/** 解析角色卡 JSON（容忍 ```json 包裹与前后说明文字，字符串/数组互相容错） */
+export function parseCharacterCard(text: string): CharacterCardDraft {
+  const json =
+    text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ?? text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
+  let obj: Record<string, unknown>
+  try {
+    obj = JSON.parse(json) as Record<string, unknown>
+  } catch {
+    throw new Error('AI 返回内容无法解析为角色卡，请调整描述后重试')
+  }
+  const asText = (v: unknown): string => {
+    if (typeof v === 'string') return v.trim()
+    if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean).join('、')
+    return ''
+  }
+  const asList = (v: unknown): string[] => {
+    if (Array.isArray(v)) return v.map((x) => String(x).trim()).filter(Boolean)
+    if (typeof v === 'string') {
+      return v
+        .split(/[,，、\n]/)
+        .map((s) => s.trim())
+        .filter(Boolean)
+    }
+    return []
+  }
+  const name = asText(obj.name)
+  if (!name) throw new Error('AI 未给出人物姓名，请补充描述后重试')
+  const rawImportance = asText(obj.importance)
+  const importance = (['protagonist', 'major', 'supporting', 'minor'] as const).includes(
+    rawImportance as 'protagonist',
+  )
+    ? (rawImportance as CharacterCardDraft['importance'])
+    : 'supporting'
+  return {
+    name,
+    aliases: asList(obj.aliases),
+    importance,
+    gender: asText(obj.gender) || undefined,
+    age: asText(obj.age) || undefined,
+    appearance: asText(obj.appearance) || undefined,
+    personalityTags: asList(obj.personalityTags),
+    desire: asText(obj.desire) || undefined,
+    flaw: asText(obj.flaw) || undefined,
+    background: asText(obj.background) || undefined,
+    abilities: asList(obj.abilities),
+    notes: asText(obj.notes) || undefined,
+    currentState: asText(obj.currentState) || undefined,
+  }
+}
+
 /* ---------------- 体检报告 AI 解读（Sprint 10 扩展） ---------------- */
 
 /** 对健康度报告做语义解读：总体诊断 + 优先行动建议 */
