@@ -50,7 +50,7 @@
 | `services/ai/templates.ts` | **提示词模板层**：系统提示 + 8 个任务 user 提示全部模板化（默认文本注册于 `DEFAULT_PROMPT_CONTENT`，键 `system/synopsis/characterBio/relationship/polish/chapterContent/consistency/health/characterCard`）；渲染规则 `{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（变量为空整块移除、之后压缩多余空行）、未提供占位符原样保留；`renderByKind(kind,vars)`/`renderCustom(content,vars)` 统一渲染；`usePromptStore`（Zustand 全局，AppLayout 挂载时 `load()`）持 overrides/customs，覆盖与自定义持久化 prompt_templates 表（**projectId='' 代表全局**；custom 行 id 前缀 `custom:`，category=作用任务）；`getEffectiveSystemPrompt()` 返回生效系统提示；`customContentById(id)` 供入口选中自定义模板 |
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 8 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
-| `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectBrief`）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
+| `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
 | `pages/project/AIHistoryPage.tsx` | AI 请求历史页（路由 `/projects/:id/ai-log`，侧栏「AI 请求」）：统计 + 列表 + 展开看完整提示/响应/错误、复制、删除、清空本项目 |
 | `components/ai/CharacterCardModal.tsx` | **一句话生成角色卡**：设定输入 → AI 产出结构化字段 → 表单逐项编辑 → `characterRepo.add` 创建人物并跳转详情（纯文本字段经 `textToHtmlParagraphs` 转富文本） |
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
@@ -140,7 +140,8 @@
 ### 本轮（AI 生成章节正文）
 - 新增第 8 个 AI 任务 `chapterContent`：`types/meta.ts` 的 `AIRequestKind` 加项；`services/ai/templates.ts`（TaskKind/TASK_ORDER/TASK_LABELS/默认模板/变量说明）；`services/ai/prompts.ts`（`ChapterContentInput` + `buildChapterContentPrompt`，变量：brief/words/chapterTitle/outlineBrief/charactersBrief/previousExcerpt/projectContext/style，条件块控制可选段）；`services/ai/tasks.ts`（`generateChapterContent`，kind=`chapterContent` 记入请求日志）。
 - 新增 `components/ai/ChapterContentModal.tsx`：写作区章节头部「AI 写正文」→ 弹窗与其它入口一致（AI 生成 / 粘贴填充 / 提示预览 / 自定义模板），自动带入本章细纲、出场人物、上一章结尾、项目速览；结果可编辑后「追加到正文末尾」或「替换整章正文」，写入走 TipTap HTML 并触发 1.5s 自动保存与版本快照。
-- `pages/project/WritingPage.tsx`：ChapterEditor 增 props（`chapters/characters/outlineNode/projectContext`），WritingPage 用 `buildProjectBrief({project,characters,locations,events})` 组装速览；提示词管理页自动多出「章节正文」卡片，AI 历史页标签同步（`AI_KIND_LABELS` 单一来源）。
+- `pages/project/WritingPage.tsx`：ChapterEditor 增 props（`chapters/characters/outlineNode/projectContext`），WritingPage 用 `buildProjectContextBrief({project,characters,locations,events})`（直接 import 自 `services/ai/contextBuilder`）组装速览；提示词管理页自动多出「章节正文」卡片，AI 历史页标签同步（`AI_KIND_LABELS` 单一来源）。
+- 排障：dev 下若报 `does not provide an export named ...`（带 `?t=` 时间戳），属 Vite HMR 模块缓存错乱 —— 清 `node_modules/.vite` 并重启 dev server + 浏览器硬刷新即可；生产构建与 dev 模块导出均已实测正常。
 
 ### 修复（输入框「按下有光标、抬起光标消失」）
 - 根因：`components/ui.tsx` 的 `Field` 用 `<label>` 包裹控件。HTML 规范下点击 `<label>` 内任意位置会把焦点交给其「第一个 labelable 元素」（`button` 也算），而 `TagInput` 的标签删除按钮排在 input 之前、富文本工具栏按钮排在编辑器之前 → mousedown 聚焦控件、click 冒泡到 label 后焦点被转给按钮，光标消失。

@@ -30,7 +30,7 @@ import PolishModal from '@/components/ai/PolishModal'
 import ChapterContentModal from '@/components/ai/ChapterContentModal'
 import CommentModal from '@/components/writing/CommentModal'
 import { autoSnapshot } from '@/services/chapterVersions'
-import { buildProjectBrief } from '@/services/ai/tasks'
+import { buildProjectContextBrief } from '@/services/ai/contextBuilder'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import { CHAPTER_STATUS_LABELS } from '@/types/chapter'
@@ -102,7 +102,7 @@ export default function WritingPage() {
 
   /** AI 生成章节正文用的项目速览（世界观 / 人物 / 地点 / 事件） */
   const projectContextText = useMemo(
-    () => (project ? buildProjectBrief({ project, characters, locations, events }) : undefined),
+    () => (project ? buildProjectContextBrief({ project, characters, locations, events }) : undefined),
     [project, characters, locations, events],
   )
 
