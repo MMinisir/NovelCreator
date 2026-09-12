@@ -12,12 +12,13 @@ import { db } from '@/db/database'
 import type { PromptTemplate } from '@/types/meta'
 import { isoNow, uid } from '@/utils/common'
 
-/** 生成任务类型（与 AIRequestKind 的前 7 项一致） */
+/** 生成任务类型（与 AIRequestKind 的前 8 项一致） */
 export type TaskKind =
   | 'synopsis'
   | 'characterBio'
   | 'relationship'
   | 'polish'
+  | 'chapterContent'
   | 'consistency'
   | 'health'
   | 'characterCard'
@@ -25,13 +26,23 @@ export type TaskKind =
 /** 可被用户管理的提示词键 */
 export type PromptTemplateKey = 'system' | TaskKind
 
-export const TASK_ORDER: TaskKind[] = ['synopsis', 'characterBio', 'relationship', 'polish', 'consistency', 'health', 'characterCard']
+export const TASK_ORDER: TaskKind[] = [
+  'synopsis',
+  'characterBio',
+  'relationship',
+  'polish',
+  'chapterContent',
+  'consistency',
+  'health',
+  'characterCard',
+]
 
 export const TASK_LABELS: Record<TaskKind, string> = {
   synopsis: '五句话梗概',
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
+  chapterContent: '章节正文',
   consistency: '一致性深度检查',
   health: '体检报告解读',
   characterCard: '一句话角色卡',
@@ -103,6 +114,31 @@ strength 取 -100 到 100 的整数（正数为正面关系，负数为负面关
 【所在章节】{{context}}{{/context}}
 {{?style}}
 【润色方向】{{style}}{{/style}}`,
+
+  /* 章节正文生成 */
+  chapterContent: `请为下面这部小说的章节撰写正文。
+要求：只输出正文内容（不要章节标题、不要任何解释、不要前后缀说明、不要 Markdown 标记）；用自然段分段，段落之间空一行；保持叙述视角、人称与文风统一；通过场景、动作与对话推进情节，避免概述式流水账与设定说明堆砌；不要重复上一章已经叙述过的内容。
+
+目标字数：约 {{words}} 字。
+{{?chapterTitle}}
+【本章标题】{{chapterTitle}}{{/chapterTitle}}
+{{?outlineBrief}}
+【本章细纲（需覆盖其中关键节点）】
+{{outlineBrief}}{{/outlineBrief}}
+{{?charactersBrief}}
+【本章出场人物（口吻与人设需与设定一致）】
+{{charactersBrief}}{{/charactersBrief}}
+{{?previousExcerpt}}
+【上一章结尾（需自然承接）】
+{{previousExcerpt}}{{/previousExcerpt}}
+{{?projectContext}}
+【世界观与人物设定参考】
+{{projectContext}}{{/projectContext}}
+
+【本章写作要求】
+{{brief}}
+{{?style}}
+【风格 / 视角要求】{{style}}{{/style}}`,
 
   /* US-805 一致性深度检查 */
   consistency: `你是资深中文小说审稿编辑。请对《{{projectName}}》进行语义一致性检查（基于设定数据与正文片段做推断），
@@ -239,6 +275,22 @@ export const PROMPT_TEMPLATE_DEFS: Record<PromptTemplateKey, PromptTemplateDef> 
       { name: 'text', desc: '待润色片段（自动截取 3000 字）' },
       { name: 'context', desc: '所在章节等上下文（可选）' },
       { name: 'style', desc: '润色方向（可选）' },
+    ],
+  },
+  chapterContent: {
+    key: 'chapterContent',
+    label: TASK_LABELS.chapterContent,
+    description: '按本章写作要求生成章节正文（自动带入大纲细纲、出场人物与上一章结尾）。',
+    category: 'task',
+    variables: [
+      { name: 'brief', desc: '本章写作要求（作者填写，必填）' },
+      { name: 'words', desc: '目标字数' },
+      { name: 'chapterTitle', desc: '章节标题（自动带入）' },
+      { name: 'outlineBrief', desc: '本章大纲细纲（自动带入，可选）' },
+      { name: 'charactersBrief', desc: '本章出场人物一句话简介（自动带入，可选）' },
+      { name: 'previousExcerpt', desc: '上一章结尾片段（自动带入，可选）' },
+      { name: 'projectContext', desc: '项目世界观与人物速览（自动带入，可选）' },
+      { name: 'style', desc: '风格 / 视角要求（可选）' },
     ],
   },
   consistency: {

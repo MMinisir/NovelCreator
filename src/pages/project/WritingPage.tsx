@@ -27,11 +27,15 @@ import { chaptersToMarkdown } from '@/utils/markdown'
 import ChapterVersionModal from '@/components/writing/ChapterVersionModal'
 import ReferencePanel from '@/components/writing/ReferencePanel'
 import PolishModal from '@/components/ai/PolishModal'
+import ChapterContentModal from '@/components/ai/ChapterContentModal'
 import CommentModal from '@/components/writing/CommentModal'
 import { autoSnapshot } from '@/services/chapterVersions'
+import { buildProjectBrief } from '@/services/ai/tasks'
 import { countWords } from '@/utils/text'
 import type { Chapter, ChapterStatus } from '@/types/chapter'
 import { CHAPTER_STATUS_LABELS } from '@/types/chapter'
+import type { Character } from '@/types'
+import type { OutlineNode } from '@/types/outline'
 import type { Project } from '@/types/project'
 import {
   RichTextEditor,
@@ -95,6 +99,12 @@ export default function WritingPage() {
   }, [loaded, sorted, selectedId, searchParams])
 
   const selected = chapters.find((c) => c.id === selectedId)
+
+  /** AI 生成章节正文用的项目速览（世界观 / 人物 / 地点 / 事件） */
+  const projectContextText = useMemo(
+    () => (project ? buildProjectBrief({ project, characters, locations, events }) : undefined),
+    [project, characters, locations, events],
+  )
 
   async function handleDelete() {
     if (!deleting) return
@@ -240,6 +250,10 @@ export default function WritingPage() {
                   <ChapterEditor
                     key={selected.id}
                     chapter={selected}
+                    chapters={sorted}
+                    characters={characters}
+                    outlineNode={outlineNodes.find((n) => n.id === selected.outlineNodeId)}
+                    projectContext={projectContextText}
                     targetWords={selected.targetWords ?? project?.chapterDefaults.targetWords}
                     onChanged={() => void refresh()}
                     onDelete={() => setDeleting(selected)}
@@ -366,11 +380,23 @@ function NewChapterModal({
 /** 单章编辑器：富文本正文 + 标题/状态 + 字数 + 自动保存 */
 function ChapterEditor({
   chapter,
+  chapters,
+  characters,
+  outlineNode,
+  projectContext,
   targetWords,
   onChanged,
   onDelete,
 }: {
   chapter: Chapter
+  /** 项目全部章节（AI 生成正文时用于取上一章结尾） */
+  chapters: Chapter[]
+  /** 项目人物（AI 生成正文时用于组装出场人物简介） */
+  characters: Character[]
+  /** 本章关联的大纲节点（可选） */
+  outlineNode?: OutlineNode
+  /** 项目速览上下文（可选） */
+  projectContext?: string
   /** 目标字数（项目默认或章节覆盖值） */
   targetWords?: number
   onChanged: () => void
@@ -385,6 +411,7 @@ function ChapterEditor({
   const [selection, setSelection] = useState<EditorSelection | null>(null) // US-806 润色选区
   const [polishOpen, setPolishOpen] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false) // US-1001 批注面板
+  const [chapterAIOpen, setChapterAIOpen] = useState(false) // AI 生成章节正文
   const editorApiRef = useRef<RichTextEditorAPIRef>({ current: null })
   const wordCount = useMemo(() => countWords(html), [html])
   // US-1001：本章未解决批注数（用于按钮角标）
@@ -496,6 +523,14 @@ function ChapterEditor({
             <MessageSquare className="size-3.5" />
             {openCommentCount > 0 && <span className="text-xs">{openCommentCount}</span>}
           </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setChapterAIOpen(true)}
+            title="AI 生成章节正文（自动带入本章细纲、出场人物与上一章结尾）"
+          >
+            <Sparkles className="size-3.5" /> AI 写正文
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setVersionOpen(true)} title="版本历史（US-504）">
             <History className="size-3.5" />
           </Button>
@@ -563,6 +598,23 @@ function ChapterEditor({
           chapterTitle={title || '未命名章节'}
           selectedText={selection?.text}
           onClose={() => setCommentOpen(false)}
+        />
+      )}
+      {chapterAIOpen && (
+        <ChapterContentModal
+          chapter={chapter}
+          chapters={chapters}
+          characters={characters}
+          outlineNode={outlineNode}
+          projectContext={projectContext}
+          defaultWords={target}
+          onClose={() => setChapterAIOpen(false)}
+          onApplied={(html, mode) => {
+            setHtml((prev) => (mode === 'replace' ? html : `${prev}${html}`))
+            setChapterAIOpen(false)
+            scheduleSave()
+            onChanged()
+          }}
         />
       )}
       {polishOpen && selection && (

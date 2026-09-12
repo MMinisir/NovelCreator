@@ -10,11 +10,20 @@ import {
   buildBioPrompt,
   buildRelationshipPrompt,
   buildPolishPrompt,
+  buildChapterContentPrompt,
   buildDeepConsistencyPrompt,
   buildCharacterCardPrompt,
   buildHealthExplainPrompt,
 } from './prompts'
-import type { SynopsisInput, BioInput, RelationshipInput, PolishInput, DeepCheckInput, CharacterCardInput } from './prompts'
+import type {
+  SynopsisInput,
+  BioInput,
+  RelationshipInput,
+  PolishInput,
+  ChapterContentInput,
+  DeepCheckInput,
+  CharacterCardInput,
+} from './prompts'
 import { finishRequestLog, startRequestLog } from './log'
 import { SYNOPSIS_PARTS } from '@/services/outline'
 import type { ConsistencyIssue, IssueLevel } from '@/services/consistency'
@@ -27,6 +36,7 @@ export type {
   BioInput,
   RelationshipInput,
   PolishInput,
+  ChapterContentInput,
   DeepCheckInput,
   CharacterCardInput,
 } from './prompts'
@@ -271,6 +281,30 @@ export async function polishText(
   return runPrompt(
     { projectId: input.projectId, kind: 'polish', inputSummary: input.context },
     withSystem(buildPolishPrompt(input, template)),
+    config,
+    signal,
+  )
+}
+
+/* ---------------- 章节正文生成 ---------------- */
+
+/**
+ * 生成章节正文：只输出正文纯文本（UI 用 textToHtmlParagraphs 转段落后追加/替换正文）。
+ * 上下文（细纲、出场人物、上一章结尾、项目速览）由调用方组装后传入。
+ */
+export async function generateChapterContent(
+  input: ChapterContentInput,
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+  template?: string,
+): Promise<string> {
+  return runPrompt(
+    {
+      projectId: input.projectId,
+      kind: 'chapterContent',
+      inputSummary: input.chapterTitle || input.brief.slice(0, 30),
+    },
+    withSystem(buildChapterContentPrompt(input, template)),
     config,
     signal,
   )

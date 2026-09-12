@@ -28,6 +28,7 @@ export const AI_KIND_LABELS: Record<AIRequestKind, string> = {
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
+  chapterContent: '章节正文',
   consistency: '一致性深度检查',
   health: '体检报告解读',
   characterCard: '一句话角色卡',
@@ -140,6 +141,42 @@ export function buildPolishPrompt(input: PolishInput, template?: string): string
     style: input.style?.trim() ?? '',
   }
   return template ? renderCustom(template, vars) : renderByKind('polish', vars)
+}
+
+/* ---------------- 章节正文生成 ---------------- */
+
+export interface ChapterContentInput {
+  /** 本章写作要求（作者输入，必填） */
+  brief: string
+  /** 章节标题 */
+  chapterTitle?: string
+  /** 目标字数 */
+  words?: number
+  /** 风格 / 视角要求 */
+  style?: string
+  /** 本章大纲细纲（自动带入，可选） */
+  outlineBrief?: string
+  /** 本章出场人物一句话简介（自动带入，可选） */
+  charactersBrief?: string
+  /** 上一章结尾片段（自动带入，可选） */
+  previousExcerpt?: string
+  /** 项目世界观与人物速览（自动带入，可选） */
+  projectContext?: string
+  projectId?: string
+}
+
+export function buildChapterContentPrompt(input: ChapterContentInput, template?: string): string {
+  const vars: Record<string, string> = {
+    brief: input.brief?.trim() ?? '',
+    words: String(input.words && input.words > 0 ? input.words : 1200),
+    chapterTitle: input.chapterTitle?.trim() ?? '',
+    outlineBrief: input.outlineBrief?.trim().slice(0, 2000) ?? '',
+    charactersBrief: input.charactersBrief?.trim().slice(0, 1500) ?? '',
+    previousExcerpt: input.previousExcerpt?.trim().slice(0, 800) ?? '',
+    projectContext: input.projectContext?.trim().slice(0, 3000) ?? '',
+    style: input.style?.trim() ?? '',
+  }
+  return template ? renderCustom(template, vars) : renderByKind('chapterContent', vars)
 }
 
 /* ---------------- US-805 一致性深度检查 ---------------- */

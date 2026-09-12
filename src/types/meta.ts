@@ -71,6 +71,7 @@ export type AIRequestKind =
   | 'characterBio'
   | 'relationship'
   | 'polish'
+  | 'chapterContent'
   | 'consistency'
   | 'health'
   | 'characterCard'
