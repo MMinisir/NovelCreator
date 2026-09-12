@@ -135,6 +135,11 @@
 
 ## 8. 最近变更
 
+### 修复（输入框「按下有光标、抬起光标消失」）
+- 根因：`components/ui.tsx` 的 `Field` 用 `<label>` 包裹控件。HTML 规范下点击 `<label>` 内任意位置会把焦点交给其「第一个 labelable 元素」（`button` 也算），而 `TagInput` 的标签删除按钮排在 input 之前、富文本工具栏按钮排在编辑器之前 → mousedown 聚焦控件、click 冒泡到 label 后焦点被转给按钮，光标消失。
+- 修复：`Field` 改为 `div` 容器 + `<label htmlFor>`（`useId` + `cloneElement` 给唯一子元素注入 id），保留「点标签文字聚焦控件」，不再抢控件焦点。**今后禁止把 Field 改回 label 包裹控件。**
+- 附带：`services/ai/templates.ts` 的 `load()` 增加 try/catch（读库失败回退内置默认并 `console.warn`），避免未捕获异常。
+
 ### 本轮（提示词管理页 + 提示模板渲染统一）
 - 新增 `services/ai/templates.ts`（模板注册/渲染/持久化）与全局页 `pages/PromptTemplatesPage.tsx`（路由 `/prompts`，顶栏「提示词管理」）：系统提示与 7 个任务提示均可在页面查看/覆盖/恢复默认，支持新增自定义模板（选作用任务），改动即时对所有项目生效。
 - `services/ai/prompts.ts` 重构为模板渲染（不改导出签名）：`buildXxxPrompt(input, template?)` 内部先算 vars 再走默认/覆盖/自定义模板；`SYSTEM_PROMPT` 常量保留为默认文案，`withSystem` 与 `runCustomPrompt` 的系统提示改取 `getEffectiveSystemPrompt()`（可被覆盖）；默认模板输出与历史逻辑等价 → 不改功能。

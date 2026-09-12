@@ -1,11 +1,12 @@
 import type {
   ButtonHTMLAttributes,
   InputHTMLAttributes,
+  ReactElement,
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from 'react'
-import { useEffect } from 'react'
+import { cloneElement, isValidElement, useEffect, useId } from 'react'
 import { X } from 'lucide-react'
 
 /** 轻量 class 拼接 */
@@ -78,16 +79,28 @@ export function Select({ className, children, ...rest }: SelectHTMLAttributes<HT
   )
 }
 
+/**
+ * 表单字段容器。
+ * ⚠️ 不要改回用 <label> 包裹 children：
+ * 当控件内部先渲染了 button 等 labelable 元素（如 TagInput 的标签删除按钮、富文本工具栏按钮）时，
+ * 点击控件会触发 label 的默认行为——把焦点转给「第一个 labelable 元素」，
+ * 表现为输入框「按下时出现光标、鼠标抬起后光标消失」。
+ * 这里用 div + label[htmlFor] 显式关联：既保留「点击标签文字聚焦控件」，又不会抢夺控件自身焦点。
+ */
 export function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: ReactNode }) {
+  const autoId = useId()
+  const child = isValidElement(children) ? (children as ReactElement<{ id?: string }>) : null
+  const control = child && !child.props.id ? cloneElement(child, { id: autoId }) : children
+  const labelFor = child ? (child.props.id ?? autoId) : undefined
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-medium text-stone-700">
+    <div className="block">
+      <label htmlFor={labelFor} className="mb-1.5 block text-sm font-medium text-stone-700">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
-      </span>
-      {children}
+      </label>
+      {control}
       {hint && <span className="mt-1 block text-xs text-stone-400">{hint}</span>}
-    </label>
+    </div>
   )
 }
 

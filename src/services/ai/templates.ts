@@ -378,25 +378,31 @@ export const usePromptStore = create<PromptStoreState>((set, get) => ({
 
   async load() {
     if (get().hydrated) return
-    const rows = await db.prompt_templates.where('projectId').equals(GLOBAL_PROJECT_ID).toArray()
-    const overrides: PromptStoreState['overrides'] = {}
-    const customs: CustomPromptTemplate[] = []
-    for (const row of rows) {
-      if (row.id.startsWith('custom:')) {
-        const kind = (TASK_KEYS as readonly string[]).includes(row.category) ? (row.category as TaskKind) : 'synopsis'
-        customs.push({
-          id: row.id,
-          name: row.name,
-          kind,
-          content: row.content,
-          createdAt: row.createdAt,
-          updatedAt: row.updatedAt,
-        })
-      } else if (Object.prototype.hasOwnProperty.call(DEFAULT_PROMPT_CONTENT, row.id)) {
-        overrides[row.id as PromptTemplateKey] = row.content
+    try {
+      const rows = await db.prompt_templates.where('projectId').equals(GLOBAL_PROJECT_ID).toArray()
+      const overrides: PromptStoreState['overrides'] = {}
+      const customs: CustomPromptTemplate[] = []
+      for (const row of rows) {
+        if (row.id.startsWith('custom:')) {
+          const kind = (TASK_KEYS as readonly string[]).includes(row.category) ? (row.category as TaskKind) : 'synopsis'
+          customs.push({
+            id: row.id,
+            name: row.name,
+            kind,
+            content: row.content,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          })
+        } else if (Object.prototype.hasOwnProperty.call(DEFAULT_PROMPT_CONTENT, row.id)) {
+          overrides[row.id as PromptTemplateKey] = row.content
+        }
       }
+      set({ overrides, customs, hydrated: true })
+    } catch (err) {
+      // 读取失败时回退内置默认模板，不影响其它功能
+      console.warn('[prompt-templates] 提示词模板加载失败，已回退内置默认：', err)
+      set({ hydrated: true })
     }
-    set({ overrides, customs, hydrated: true })
   },
 
   getContent(key) {
