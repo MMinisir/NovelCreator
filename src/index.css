@@ -81,6 +81,12 @@ body {
   text-decoration: underline;
 }
 
+/* 打字机模式：更醒目的光标 + 底部留白（使最后一段也能滚动到视觉中部） */
+.typewriter-caret .ProseMirror {
+  caret-color: rgb(124 58 237);
+  padding-bottom: 40vh;
+}
+
 /* 富文本静态展示 */
 .rich-display h1,
 .rich-display h2,

@@ -9,12 +9,14 @@ import {
   History,
   MessageSquare,
   MessageSquarePlus,
+  PanelLeft,
   Printer,
   PenLine,
   Plus,
   Sparkles,
   Target,
   Trash2,
+  Type,
 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { characterRepo, chapterRepo, commentRepo, deleteChapterCascade, eventRepo, foreshadowingRepo, locationRepo, outlineRepo } from '@/db/repositories'
@@ -66,6 +68,8 @@ export default function WritingPage() {
   const [exporting, setExporting] = useState<'docx' | null>(null) // US-701 导出中状态
   const [creating, setCreating] = useState(false)
   const [deleting, setDeleting] = useState<Chapter | null>(null)
+  const [listCollapsed, setListCollapsed] = useState(false) // 折叠章节列表，给正文让出宽度
+  const [typewriter, setTypewriter] = useState(() => localStorage.getItem('novel:typewriter') !== '0') // 打字机模式（默认开）
 
   const sorted = useMemo(
     () =>
@@ -133,6 +137,15 @@ export default function WritingPage() {
     }
   }
 
+  /** 打字机模式开关（本机偏好记忆：输入时当前行保持在屏幕中部） */
+  function toggleTypewriter() {
+    setTypewriter((v) => {
+      const next = !v
+      localStorage.setItem('novel:typewriter', next ? '1' : '0')
+      return next
+    })
+  }
+
   /** US-701 扩展：通过打印对话框导出 PDF */
   function handleExportPdf() {
     try {
@@ -152,6 +165,20 @@ export default function WritingPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={listCollapsed ? 'primary' : 'secondary'}
+            onClick={() => setListCollapsed((v) => !v)}
+            title="显示 / 隐藏章节列表（给正文让出更多空间）"
+          >
+            <PanelLeft className="size-4" /> 章节列表
+          </Button>
+          <Button
+            variant={typewriter ? 'primary' : 'secondary'}
+            onClick={toggleTypewriter}
+            title="打字机模式：输入时当前行保持在屏幕中部，视线不用追着文字往下跑"
+          >
+            <Type className="size-4" /> 打字机
+          </Button>
           <Button
             variant={showReference ? 'primary' : 'secondary'}
             onClick={() => setShowReference((v) => !v)}
@@ -198,7 +225,12 @@ export default function WritingPage() {
       ) : (
         <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start">
           {/* 章节列表 */}
-          <aside className="w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm lg:w-72">
+          <aside
+            className={cn(
+              'w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm',
+              listCollapsed ? 'hidden' : 'lg:w-72',
+            )}
+          >
             <div className="mb-2 flex items-center justify-between px-1">
               <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">章节列表</span>
               <button onClick={() => setCreating(true)} className="cursor-pointer rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-violet-700" aria-label="新建章节">
@@ -255,6 +287,7 @@ export default function WritingPage() {
                     outlineNode={outlineNodes.find((n) => n.id === selected.outlineNodeId)}
                     projectContext={projectContextText}
                     targetWords={selected.targetWords ?? project?.chapterDefaults.targetWords}
+                    typewriter={typewriter}
                     onChanged={() => void refresh()}
                     onDelete={() => setDeleting(selected)}
                   />
@@ -385,6 +418,7 @@ function ChapterEditor({
   outlineNode,
   projectContext,
   targetWords,
+  typewriter,
   onChanged,
   onDelete,
 }: {
@@ -399,6 +433,8 @@ function ChapterEditor({
   projectContext?: string
   /** 目标字数（项目默认或章节覆盖值） */
   targetWords?: number
+  /** 打字机模式：输入时当前行保持在编辑区中部 */
+  typewriter?: boolean
   onChanged: () => void
   onDelete: () => void
 }) {
@@ -475,7 +511,7 @@ function ChapterEditor({
   const progress = target ? Math.min(100, Math.round((wordCount / target) * 100)) : undefined
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
       {/* 头部：标题 + 状态 + 保存指示 */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input
@@ -576,7 +612,9 @@ function ChapterEditor({
         apiRef={editorApiRef.current}
         onSelectionChange={setSelection}
         placeholder="此刻开始书写故事……（支持标题、加粗、列表、引用等；选中文字可 AI 润色）"
-        minHeight="min-h-[42vh] md:min-h-[62vh]"
+        minHeight="min-h-40"
+        scrollClassName="h-[26rem] min-h-72 lg:h-[calc(100vh-23rem)]"
+        typewriter={typewriter}
       />
       <p className="mt-2 text-right text-xs text-stone-300">停笔 1.5 秒后自动保存至浏览器本地</p>
 

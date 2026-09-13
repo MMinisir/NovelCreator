@@ -19,7 +19,7 @@
 | `services/exportImport.ts` | 项目 JSON 导出/导入（全表按 projectId 收集） |
 | `types/` | `base.ts`(id/时间戳通用)、`project.ts`、`character.ts`、`world.ts`(Location/StoryEvent/Relationship)、`outline.ts`、`chapter.ts`、`meta.ts`(Foreshadowing/模板等) |
 | `components/ui.tsx` | **统一 UI 原语**：Button/Input/Textarea/Select/Field/Badge/Modal/ConfirmDialog/EmptyState/Tooltip/TextWithHint… 颜色 Badge='violet'/'amber'/'green'/'slate' 等；风格=圆角卡片 stone 系 |
-| `components/rich/RichTextEditor.tsx` | TipTap 封装（StarterKit），value/onChange=**HTML 字符串** |
+| `components/rich/RichTextEditor.tsx` | TipTap 封装（StarterKit），value/onChange=**HTML 字符串**；可选 `typewriter`（打字机模式：输入时光标行平滑滚到滚动容器纵向 42%）+ `scrollClassName`（编辑区独立滚动容器的高度类） |
 | `components/layout/` | 应用壳：侧栏导航/顶栏 |
 | `components/{people,relationship,project,time,outline}/` | 分模块组件（如 outline 下 OutlineSetupCards / OutlineNodeEditor）；time/FlexibleTimeEditor 灵活时间编辑 |
 | `services/ai/` | **AI 服务层（Sprint 5 预研 + Sprint 7 开放）**：`types.ts`(AIProvider 接口/AIProviderConfig)、`openaiCompat.ts`(OpenAI 兼容 Provider + createAIProvider)、`contextBuilder.ts`(项目/人物上下文纯函数)、**`config.ts`**(US-801 配置 localStorage + 服务商预设)、**`tasks.ts`**(US-802~804 生成与解析：generateSynopsisText/parseSynopsis、generateCharacterBioText、generateRelationshipSuggestions/parseRelationshipSuggestions) |
@@ -111,7 +111,7 @@
 - **评论批注（US-1001 已交付）**：写作区章节头部「批注」按钮（显示未解决条数）打开面板；选中正文后「添加批注」会自动记录引用文本。`comments` 表（Sprint 0 已建，索引 `id, projectId, targetType, targetId, status`）挂 `targetType='chapter'`+`targetId=章节id`，`anchor` 存引用文本；支持回复（parentId）、解决/重开、删除（删根评论会连带删除其回复）；`deleteChapterCascade` 已级联清理章节批注。
 - **故事体检报告（Sprint 10 新增用户故事已交付）**：路由 `/projects/:id/health`（侧栏「体检报告」），`services/health.ts` 纯函数计算：伏笔回收（回收率为主，缺锚点/超 30 天扣分）、人物弧光（主要人物 desire/flaw/弧光阶段/当前状态四项 25 分制）、时间线连贯（事件参与者/地点/非模糊时间占比）、设定一致性（严重 -8/提示 -3/提醒 -1）、章节进度（完成率 60% + 均字达标 40%）；加权总分 + 等级 + 去重建议（按维度低分优先）。
 - **导出扩展（US-701 DOCX/PDF 已交付）**：写作区头部「导出 Word」→ `docx` 库生成（标题居中 + 每章另起页 + 首行缩进，动态 import 不拖首屏）；「导出 PDF」→ 生成 A4 排版打印 HTML 并 `window.print()`，在打印对话框选「另存为 PDF」（保留中文字体、零依赖）。Markdown 导出（Sprint 6）保持不变。
-- **移动端（US-902/903 已交付基础版）**：ProjectWorkspace 在 `md` 以下把左侧栏换成内容顶部横向滚动 tab（全部模块可达）；查看类页面网格本就是 `grid-cols-1 sm/lg/xl` 响应式（人物/大纲/时间线可直接查看）；写作区窄屏布局改为列向堆叠（章节列表在上、编辑器在下），正文区 `overflow-wrap:anywhere` 防横向溢出，编辑器最小高度移动端降到 42vh（避免键盘遮挡）。时间线行为固定行高容器、内容 chips wrap，无整页横向滚动。
+- **移动端（US-902/903 已交付基础版）**：ProjectWorkspace 在 `md` 以下把左侧栏换成内容顶部横向滚动 tab（全部模块可达）；查看类页面网格本就是 `grid-cols-1 sm/lg/xl` 响应式（人物/大纲/时间线可直接查看）；写作区窄屏布局改为列向堆叠（章节列表在上、编辑器在下，列表可折叠），正文区 `overflow-wrap:anywhere` 防横向溢出，编辑区高度改为独立滚动容器（移动端 `h-[26rem]`、桌面端 `lg:h-[calc(100vh-23rem)]` 撑满视口）并支持打字机模式。时间线行为固定行高容器、内容 chips wrap，无整页横向滚动。
 - **时间线（Sprint 5+6 已交付）**：路由 `/projects/:id/timeline`（TimelinePage）。全局=全部事件；顶部 Select 选人=角色时间线（该人物事件+`CharacterState` 状态变化合并）。筛选=人物/地点/类型 chips + **「伏笔节点」开关（US-602，sky 色节点）**。排序=compareFlexibleTime 类别段内序；**模糊/相对事件行右侧 ▲▼ 在同类段内移动**（写 `time.sortOrder`，首次移动自动归一 0..n-1）。虚拟滚动=react-window v2 `List`。事件编辑仍在事件页。
 - **伏笔管理（Sprint 6 已交付）**：路由 `/projects/:id/foreshadowing`（ForeshadowingsPage）。列表状态筛选（全部/活跃/已回收/已废弃）+ 优先级/预期回收事件/相关人物展示；新建/编辑 Modal（描述必填；**预期回收事件**锚到事件 → 时间线节点）；删除走 `deleteForeshadowingCascade`（自动解除全部大纲节点 planted/resolved 引用）。大纲节点侧（OutlineNodeEditor）埋设/回收闭环仍可用。
 - **Markdown 导出（US-701）**：写作页头部「导出 Markdown」→ `chaptersToMarkdown` 组装（# 作品名 + 元信息 + 按顺序各章 `## 标题` + 状态/字数 + htmlToMarkdown 正文）。htmlToMarkdown 支持子集：h1-6/p/strong/em/code/s/del/a/br/img/blockquote/ul/ol(嵌套)/hr/pre。DOCX/PDF 留 Sprint 10。
@@ -137,7 +137,11 @@
 
 ## 8. 最近变更
 
-### 本轮（AI 生成章节正文）
+### 本轮（写作区布局整理 + 打字机模式）
+- 布局：`ProjectWorkspace` 在 `/writing` 路由把容器从 `max-w-7xl` 放宽到 `max-w-[1800px]`（其它页面不变）；写作页新增「章节列表」折叠开关（隐藏列表给正文让宽）；`ChapterEditor` 卡片 padding `p-5`→`p-4`；正文编辑区改为**独立滚动容器并撑满视口**（`h-[26rem] min-h-72 lg:h-[calc(100vh-23rem)]`，取代原 `min-h-[42vh] md:min-h-[62vh]`）。
+- 打字机模式：`RichTextEditor` 新增 `typewriter` + `scrollClassName`；写作页头部「打字机」按钮（`Type` 图标，默认开，偏好存 localStorage `novel:typewriter`）；输入（TipTap `update` 事件）时用 `editor.view.coordsAtPos` 计算光标位置，把光标行平滑滚到滚动容器纵向 42% 处（位移 <8px 不动，防抖）；`.typewriter-caret .ProseMirror` 给紫色醒目光标 + `padding-bottom: 40vh` 留白，使最后一段也能滚到中部。
+
+### 上轮（AI 生成章节正文）
 - 新增第 8 个 AI 任务 `chapterContent`：`types/meta.ts` 的 `AIRequestKind` 加项；`services/ai/templates.ts`（TaskKind/TASK_ORDER/TASK_LABELS/默认模板/变量说明）；`services/ai/prompts.ts`（`ChapterContentInput` + `buildChapterContentPrompt`，变量：brief/words/chapterTitle/outlineBrief/charactersBrief/previousExcerpt/projectContext/style，条件块控制可选段）；`services/ai/tasks.ts`（`generateChapterContent`，kind=`chapterContent` 记入请求日志）。
 - 新增 `components/ai/ChapterContentModal.tsx`：写作区章节头部「AI 写正文」→ 弹窗与其它入口一致（AI 生成 / 粘贴填充 / 提示预览 / 自定义模板），自动带入本章细纲、出场人物、上一章结尾、项目速览；结果可编辑后「追加到正文末尾」或「替换整章正文」，写入走 TipTap HTML 并触发 1.5s 自动保存与版本快照。
 - `pages/project/WritingPage.tsx`：ChapterEditor 增 props（`chapters/characters/outlineNode/projectContext`），WritingPage 用 `buildProjectContextBrief({project,characters,locations,events})`（直接 import 自 `services/ai/contextBuilder`）组装速览；提示词管理页自动多出「章节正文」卡片，AI 历史页标签同步（`AI_KIND_LABELS` 单一来源）。

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -60,6 +60,8 @@ export function RichTextEditor({
   minHeight = 'min-h-24',
   apiRef,
   onSelectionChange,
+  typewriter = false,
+  scrollClassName,
 }: {
   value?: string
   onChange: (html: string) => void
@@ -69,7 +71,12 @@ export function RichTextEditor({
   apiRef?: RichTextEditorAPIRef
   /** 选区变化上报（from===to 或无文本时报 null） */
   onSelectionChange?: (sel: EditorSelection | null) => void
+  /** 打字机模式：输入时把光标所在行保持在滚动容器纵向约 40% 处（需配合 scrollClassName） */
+  typewriter?: boolean
+  /** 编辑区独立滚动容器的高度类（如 h-[calc(100vh-23rem)]），配合打字机模式使用，正文过长时内部滚动 */
+  scrollClassName?: string
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null)
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -100,6 +107,28 @@ export function RichTextEditor({
     editor.commands.setContent(value || '', false)
   }, [value, editor])
 
+  // 打字机模式：输入（update）时把光标行滚到滚动容器纵向中部，保持「打字机」式的视线稳定
+  useEffect(() => {
+    if (!editor || !typewriter) return
+    const scrollToCaret = () => {
+      const box = scrollRef.current
+      if (!box) return
+      const { from } = editor.state.selection
+      const coords = editor.view.coordsAtPos(from)
+      const boxRect = box.getBoundingClientRect()
+      const caretTop = coords.top - boxRect.top + box.scrollTop
+      const target = caretTop - box.clientHeight * 0.42
+      const max = Math.max(0, box.scrollHeight - box.clientHeight)
+      const next = Math.max(0, Math.min(target, max))
+      if (Math.abs(next - box.scrollTop) < 8) return
+      box.scrollTo({ top: next, behavior: 'smooth' })
+    }
+    editor.on('update', scrollToCaret)
+    return () => {
+      editor.off('update', scrollToCaret)
+    }
+  }, [editor, typewriter])
+
   // 暴露选区/替换 API
   useEffect(() => {
     if (!apiRef || !editor) return
@@ -125,9 +154,20 @@ export function RichTextEditor({
   }, [editor, apiRef])
 
   return (
-    <div className="overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:ring-2 focus-within:ring-violet-500/40 focus-within:border-violet-500">
+    <div
+      className={cn(
+        'overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:ring-2 focus-within:ring-violet-500/40 focus-within:border-violet-500',
+        typewriter && 'typewriter-caret',
+      )}
+    >
       {editor && <Toolbar editor={editor} />}
-      <EditorContent editor={editor} />
+      {scrollClassName ? (
+        <div ref={scrollRef} className={cn('overflow-y-auto', scrollClassName)}>
+          <EditorContent editor={editor} />
+        </div>
+      ) : (
+        <EditorContent editor={editor} />
+      )}
     </div>
   )
 }
