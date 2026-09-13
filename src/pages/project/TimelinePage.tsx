@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { List, type ListImperativeAPI, type RowComponentProps } from 'react-window'
-import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, GanttChart, Info, LayoutList, Pencil } from 'lucide-react'
+import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, Flame, GanttChart, Info, LayoutList, Pencil } from 'lucide-react'
 import { Badge, Button, EmptyState, Select, cn } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -412,6 +412,14 @@ function TimelineRow({
                 {row.eventType}
               </span>
             )}
+            {isEvent && row.tension ? (
+              <span
+                className="inline-flex items-center gap-0.5 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-medium text-rose-600"
+                title={`情节张力 ${row.tension}/5`}
+              >
+                <Flame className="size-2.5" /> 张力 {row.tension}
+              </span>
+            ) : null}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-stone-400">
             {isForeshadow && (

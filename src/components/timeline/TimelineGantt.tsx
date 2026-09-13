@@ -11,6 +11,22 @@ const COL_W = 56
 const ROW_H = 36
 const MAX_COLUMNS = 150
 
+/** 张力带高度（px）与张力柱配色（1 平缓 → 5 高潮） */
+const BAND_H = 56
+const TENSION_BAR: Record<number, string> = {
+  1: 'bg-sky-200',
+  2: 'bg-sky-400',
+  3: 'bg-amber-300',
+  4: 'bg-orange-400',
+  5: 'bg-rose-500',
+}
+const TENSION_HINT = '1 平缓 / 2 铺垫 / 3 推进 / 4 紧张 / 5 高潮'
+
+/** 张力柱高（与折线共用同一口径，保证折线贴合柱顶） */
+function tensionBarHeight(tension: number): number {
+  return Math.max(6, (tension / 5) * (BAND_H - 8))
+}
+
 /** 事件类型 → 实心色点（甘特图节点用） */
 const EVENT_DOT: Record<string, string> = {
   主线: 'bg-violet-500',
@@ -54,6 +70,25 @@ export default function TimelineGantt({
 
   const shown = useMemo(() => columns.slice(0, MAX_COLUMNS), [columns])
   const selected = useMemo(() => columns.find((c) => c.key === selectedKey), [columns, selectedKey])
+
+  /** 情节张力折线（连接各已评估事件的柱顶，直观呈现跌宕起伏） */
+  const curvePath = useMemo(() => {
+    const points = shown
+      .map((t, i) => (t.tension ? { x: i * COL_W + COL_W / 2, y: BAND_H - tensionBarHeight(t.tension) } : null))
+      .filter((p): p is { x: number; y: number } => Boolean(p))
+    if (points.length < 2) return ''
+    return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
+  }, [shown])
+
+  /** 张力摘要（平均 / 峰值） */
+  const tensionStats = useMemo(() => {
+    const values = shown.map((t) => t.tension).filter((v): v is number => Boolean(v))
+    if (values.length === 0) return null
+    const max = Math.max(...values)
+    const peak = shown.find((t) => t.tension === max)
+    const avg = values.reduce((sum, v) => sum + v, 0) / values.length
+    return { avg, max, peakName: peak?.name ?? '', count: values.length }
+  }, [shown])
 
   const lanes = useMemo(() => {
     const idxOf = (pred: (t: TimelineItem) => boolean) =>
@@ -177,6 +212,56 @@ export default function TimelineGantt({
                 ))}
               </div>
 
+              {/* 情节张力带：柱高 = 跌宕程度，折线 = 起伏趋势 */}
+              <div className="flex border-b border-stone-200">
+                <div className="sticky left-0 z-30 flex w-36 shrink-0 flex-col justify-center gap-0.5 border-r border-stone-200 bg-stone-50 px-2 py-1">
+                  <span className="text-[11px] font-semibold text-stone-500">情节张力</span>
+                  <span className="text-[10px] leading-tight text-stone-400">1 平缓 → 5 高潮</span>
+                </div>
+                <div className="relative" style={{ width: shown.length * COL_W, height: BAND_H }}>
+                  {curvePath && (
+                    <svg
+                      className="pointer-events-none absolute inset-0"
+                      width={shown.length * COL_W}
+                      height={BAND_H}
+                      aria-hidden
+                    >
+                      <path
+                        d={curvePath}
+                        fill="none"
+                        stroke="rgb(244 63 94 / 0.5)"
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  )}
+                  <div className="flex h-full">
+                    {shown.map((t) => (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setSelectedKey(t.key)}
+                        title={`${t.name} · ${t.tension ? `张力 ${t.tension}/5` : '未评估张力'}`}
+                        className={cn(
+                          'flex h-full w-14 shrink-0 cursor-pointer items-end justify-center border-l border-stone-100 transition-colors hover:bg-violet-50/60',
+                          selectedKey === t.key && 'bg-violet-50/60',
+                        )}
+                      >
+                        {t.tension ? (
+                          <span
+                            className={cn('w-4 rounded-t', TENSION_BAR[t.tension] ?? 'bg-stone-300')}
+                            style={{ height: tensionBarHeight(t.tension) }}
+                          />
+                        ) : (
+                          <span className="mb-1.5 size-1.5 rounded-full bg-stone-300" />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
               {/* 泳道行 */}
               {lanes.map((lane) => {
                 const first = lane.idxs[0]
@@ -236,7 +321,20 @@ export default function TimelineGantt({
             {t}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1">
+          <span className="size-2.5 rounded-sm bg-sky-200" />
+          <span className="size-2.5 rounded-sm bg-amber-300" />
+          <span className="size-2.5 rounded-sm bg-rose-500" />
+          情节张力柱（{TENSION_HINT}）
+        </span>
         <span className="ml-auto">紫色横条 = 该{groupBy === 'character' ? '人物' : '地点'}的活跃区间（首次→末次出现）</span>
+        {tensionStats && (
+          <span className="w-full text-stone-400">
+            已评估 {tensionStats.count}/{shown.length} 个事件 · 平均张力 {tensionStats.avg.toFixed(1)} · 峰值{' '}
+            {tensionStats.max}
+            {tensionStats.peakName && `（${tensionStats.peakName}）`}
+          </span>
+        )}
       </div>
     </div>
   )

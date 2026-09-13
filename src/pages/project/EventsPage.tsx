@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { CalendarClock, Pencil, Plus, Search, Star, Trash2 } from 'lucide-react'
+import { CalendarClock, Flame, Pencil, Plus, Search, Star, Trash2 } from 'lucide-react'
 import { Badge, Button, ConfirmDialog, EmptyState, Field, Input, Modal, Select, Textarea, cn } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -125,6 +125,15 @@ export default function EventsPage() {
                       ))}
                     </div>
                   )}
+                  {e.tension ? (
+                    <div
+                      className="mt-0.5 inline-flex items-center gap-0.5 text-rose-500"
+                      title={`情节张力 ${e.tension}/5`}
+                    >
+                      <Flame className="size-3 fill-current" />
+                      <span className="text-[10px] font-semibold">{e.tension}</span>
+                    </div>
+                  ) : null}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -221,6 +230,7 @@ function EventFormModal({
   const [type, setType] = useState(existing?.type ?? EVENT_TYPES[0])
   const [time, setTime] = useState<FlexibleTimestamp>(existing?.time ?? { type: 'fuzzy', value: '' })
   const [importance, setImportance] = useState(existing?.importance ?? 3)
+  const [tension, setTension] = useState(existing?.tension ?? 0)
   const [locationId, setLocationId] = useState(existing?.locationId ?? '')
   const [participants, setParticipants] = useState<string[]>(existing?.participantIds ?? [])
   const [description, setDescription] = useState(existing?.description ?? '')
@@ -241,6 +251,7 @@ function EventFormModal({
         type,
         time,
         importance,
+        tension: tension || undefined,
         locationId: locationId || undefined,
         participantIds: participants,
         description: description || undefined,
@@ -294,22 +305,40 @@ function EventFormModal({
           <Field label="事件名称" required>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：青云大比决赛" autoFocus />
           </Field>
-          <Field label="重要性">
-            <div className="flex h-10 items-center gap-1">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setImportance(n)}
-                  className={cn('p-1 cursor-pointer', n <= importance ? 'text-amber-400' : 'text-stone-200')}
-                  aria-label={`${n} 星`}
-                >
-                  <Star className="size-5 fill-current" />
-                </button>
-              ))}
-              <span className="ml-2 text-xs text-stone-400">{importance} / 5</span>
-            </div>
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="重要性">
+              <div className="flex h-10 items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setImportance(n)}
+                    className={cn('cursor-pointer p-0.5', n <= importance ? 'text-amber-400' : 'text-stone-200')}
+                    aria-label={`${n} 星`}
+                  >
+                    <Star className="size-4 fill-current" />
+                  </button>
+                ))}
+                <span className="ml-1 text-xs text-stone-400">{importance}</span>
+              </div>
+            </Field>
+            <Field label="情节张力" hint="1 平缓 → 5 高潮，再点一次取消">
+              <div className="flex h-10 items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setTension(tension === n ? 0 : n)}
+                    className={cn('cursor-pointer p-0.5', n <= tension ? 'text-rose-500' : 'text-stone-200')}
+                    aria-label={`张力 ${n}`}
+                  >
+                    <Flame className="size-4 fill-current" />
+                  </button>
+                ))}
+                <span className="ml-1 text-xs text-stone-400">{tension === 0 ? '—' : tension}</span>
+              </div>
+            </Field>
+          </div>
         </div>
 
         <Field label="发生时间" hint="支持精确日期、章节时间或模糊时间（如“三年后”）">

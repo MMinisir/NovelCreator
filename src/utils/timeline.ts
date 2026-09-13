@@ -24,6 +24,8 @@ export interface TimelineItem {
   eventType?: string
   /** 事件星级 */
   importance?: number
+  /** 情节张力 / 跌宕程度：1-5（undefined = 未评估） */
+  tension?: number
   locationId?: string
   participantIds: string[]
   /** 状态条目所属人物名（未知时显示“未知”） */
@@ -62,6 +64,7 @@ export function buildTimelineItems(options: {
       name: e.name,
       eventType: e.type,
       importance: e.importance,
+      tension: e.tension,
       locationId: e.locationId,
       participantIds: e.participantIds ?? [],
       updatedAt: e.updatedAt,

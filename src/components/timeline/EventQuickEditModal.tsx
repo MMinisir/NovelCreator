@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
-import { Star } from 'lucide-react'
+import { Flame, Star } from 'lucide-react'
 import { Button, Field, Input, Modal, Select, cn } from '@/components/ui'
 import { FlexibleTimeEditor } from '@/components/time/FlexibleTimeEditor'
 import { CharacterMultiSelect } from '@/components/people/CharacterMultiSelect'
@@ -28,6 +28,7 @@ export default function EventQuickEditModal({
 }) {
   const [name, setName] = useState(event.name)
   const [importance, setImportance] = useState(event.importance)
+  const [tension, setTension] = useState(event.tension ?? 0)
   const [time, setTime] = useState(event.time)
   const [type, setType] = useState(event.type)
   const [locationId, setLocationId] = useState(event.locationId ?? '')
@@ -47,6 +48,7 @@ export default function EventQuickEditModal({
       const patch: Partial<StoryEvent> = {
         name: name.trim(),
         importance,
+        tension: tension || undefined,
         time,
         type,
         locationId: locationId || undefined,
@@ -89,22 +91,40 @@ export default function EventQuickEditModal({
           <Field label="事件名称" required>
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="如：青云大比决赛" autoFocus />
           </Field>
-          <Field label="重要性">
-            <div className="flex h-10 items-center gap-1">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  onClick={() => setImportance(n)}
-                  className={cn('cursor-pointer p-1', n <= importance ? 'text-amber-400' : 'text-stone-200')}
-                  aria-label={`${n} 星`}
-                >
-                  <Star className="size-5 fill-current" />
-                </button>
-              ))}
-              <span className="ml-2 text-xs text-stone-400">{importance} / 5</span>
-            </div>
-          </Field>
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="重要性">
+              <div className="flex h-10 items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setImportance(n)}
+                    className={cn('cursor-pointer p-0.5', n <= importance ? 'text-amber-400' : 'text-stone-200')}
+                    aria-label={`${n} 星`}
+                  >
+                    <Star className="size-4 fill-current" />
+                  </button>
+                ))}
+                <span className="ml-1 text-xs text-stone-400">{importance}</span>
+              </div>
+            </Field>
+            <Field label="情节张力" hint="再点一次可取消">
+              <div className="flex h-10 items-center gap-0.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setTension(tension === n ? 0 : n)}
+                    className={cn('cursor-pointer p-0.5', n <= tension ? 'text-rose-500' : 'text-stone-200')}
+                    aria-label={`张力 ${n}`}
+                  >
+                    <Flame className="size-4 fill-current" />
+                  </button>
+                ))}
+                <span className="ml-1 text-xs text-stone-400">{tension === 0 ? '—' : tension}</span>
+              </div>
+            </Field>
+          </div>
         </div>
 
         <Field label="发生时间" hint="支持精确日期、章节时间或模糊时间（如“三年后”）">

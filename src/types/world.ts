@@ -36,6 +36,11 @@ export interface StoryEvent extends BaseEntity {
   foreshadowingIds: string[]
   /** 重要性：1-5 星 */
   importance: number
+  /**
+   * 情节张力 / 跌宕程度：1（平缓）~ 5（高潮），undefined = 未评估。
+   * 时间线甘特图据此绘制「情节起伏曲线」。
+   */
+  tension?: number
   /** 排序权重：用于同时间事件排序 */
   sortWeight: number
 }
