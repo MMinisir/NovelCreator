@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { List, type ListImperativeAPI, type RowComponentProps } from 'react-window'
-import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, GanttChart, Info, LayoutList } from 'lucide-react'
+import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, GanttChart, Info, LayoutList, Pencil } from 'lucide-react'
 import { Badge, Button, EmptyState, Select, cn } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -19,6 +19,7 @@ import {
   type TimelineItem,
 } from '@/utils/timeline'
 import TimelineGantt from '@/components/timeline/TimelineGantt'
+import EventQuickEditModal from '@/components/timeline/EventQuickEditModal'
 import type { CharacterStateKind, StoryEvent } from '@/types'
 
 /** 状态变化徽标配色（与人物详情状态历史一致） */
@@ -46,6 +47,7 @@ interface TimelineRowData {
   charName: (id: string) => string
   locName: (id?: string) => string
   onMove: (index: number, dir: -1 | 1) => void
+  onEdit: (eventId: string) => void
   busy: boolean
 }
 
@@ -65,6 +67,7 @@ export default function TimelinePage() {
   const [showForeshadowings, setShowForeshadowings] = useState(true) // US-602 伏笔预期回收节点开关
   const [busy, setBusy] = useState(false)
   const [view, setView] = useState<'list' | 'gantt'>('list') // US-304 扩展：列表 / 甘特图视图
+  const [editingEventId, setEditingEventId] = useState<string | null>(null) // 快速编辑事件
   const listRef = useRef<ListImperativeAPI | null>(null)
 
   const charById = useMemo(() => {
@@ -155,10 +158,12 @@ export default function TimelinePage() {
   const rowKey = useCallback((i: number) => rows[i]?.key ?? i, [rows])
 
   const itemData: TimelineRowData = useMemo(
-    () => ({ rows, charName, locName, onMove: handleMove, busy }),
+    () => ({ rows, charName, locName, onMove: handleMove, onEdit: (id: string) => setEditingEventId(id), busy }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [rows, locations, characters, busy],
   )
+
+  const editingEvent = events.find((e) => e.id === editingEventId)
 
   return (
     <div className="flex flex-col">
@@ -294,6 +299,7 @@ export default function TimelinePage() {
           locations={locations}
           charName={charName}
           locName={locName}
+          onEdit={(id) => setEditingEventId(id)}
         />
       ) : (
         <>
@@ -319,6 +325,19 @@ export default function TimelinePage() {
           </div>
         </>
       )}
+
+      {editingEvent && (
+        <EventQuickEditModal
+          event={editingEvent}
+          characters={characters}
+          locations={locations}
+          onClose={() => setEditingEventId(null)}
+          onSaved={(patch) => {
+            setItems((prev: StoryEvent[]) => prev.map((e) => (e.id === editingEvent.id ? { ...e, ...patch } : e)))
+            setEditingEventId(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -330,6 +349,7 @@ function TimelineRow({
   charName,
   locName,
   onMove,
+  onEdit,
   busy,
 }: RowComponentProps<TimelineRowData>) {
   const row = rows[index]
@@ -414,6 +434,20 @@ function TimelineRow({
             )}
           </div>
         </div>
+        {/* 快速编辑（列表视图） */}
+        {isEvent && (
+          <div className="flex shrink-0 items-center">
+            <button
+              type="button"
+              onClick={() => onEdit(row.id)}
+              className="cursor-pointer rounded p-1 text-stone-300 transition-colors hover:bg-violet-50 hover:text-violet-600"
+              aria-label="快速编辑事件"
+              title="快速编辑事件（名称/时间/类型/地点/参与者）"
+            >
+              <Pencil className="size-4" />
+            </button>
+          </div>
+        )}
         {/* 手动排序（US-303） */}
         {isEvent && manualKindOf(row.time) && (
           <div className="flex shrink-0 flex-col items-center justify-center gap-0.5">

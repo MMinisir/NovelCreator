@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Info } from 'lucide-react'
+import { Info, Pencil } from 'lucide-react'
 import { cn } from '@/components/ui'
 import { timeLabel } from '@/utils/time'
 import { EVENT_TYPES, EVENT_TYPE_STYLE } from '@/utils/eventTypes'
@@ -38,6 +38,7 @@ export default function TimelineGantt({
   locations,
   charName,
   locName,
+  onEdit,
 }: {
   /** 事件列（已按时间线顺序排序，来自列表视图的同一份数据） */
   columns: TimelineItem[]
@@ -45,6 +46,8 @@ export default function TimelineGantt({
   locations: Location[]
   charName: (id: string) => string
   locName: (id?: string) => string
+  /** 点击「编辑事件」回调（由页面打开快速编辑弹窗） */
+  onEdit: (eventId: string) => void
 }) {
   const [groupBy, setGroupBy] = useState<GroupBy>('character')
   const [selectedKey, setSelectedKey] = useState<string | null>(null)
@@ -120,13 +123,23 @@ export default function TimelineGantt({
           {selected.participantIds.length > 0 && (
             <span className="truncate">参与者：{selected.participantIds.map((id) => charName(id)).join('、')}</span>
           )}
-          <button
-            type="button"
-            onClick={() => setSelectedKey(null)}
-            className="ml-auto cursor-pointer text-stone-400 hover:text-stone-600"
-          >
-            关闭
-          </button>
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onEdit(selected.id)}
+              className="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-violet-700 px-2.5 py-1 text-[11px] font-medium text-white transition-colors hover:bg-violet-800"
+              title="快速编辑该事件（名称/时间/类型/地点/参与者）"
+            >
+              <Pencil className="size-3" /> 编辑事件
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedKey(null)}
+              className="cursor-pointer text-stone-400 hover:text-stone-600"
+            >
+              关闭
+            </button>
+          </div>
         </div>
       )}
 
