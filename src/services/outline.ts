@@ -205,6 +205,89 @@ export async function applySynopsis(projectId: string, lines: string[]): Promise
   }
 }
 
+/* ---------------- AI 生成大纲落库 ---------------- */
+
+/** AI 生成大纲的结构化输入（与 tasks.ts 的 OutlinePlan 结构一致，避免 AI 层反向依赖） */
+export interface GeneratedOutlineChapter {
+  title: string
+  content?: string
+}
+
+export interface GeneratedOutlineAct {
+  title: string
+  summary?: string
+  chapters: GeneratedOutlineChapter[]
+}
+
+export interface GeneratedOutlinePlan {
+  acts: GeneratedOutlineAct[]
+}
+
+/** 纯文本 → <p> 段落 HTML（大纲节点核心剧情按富文本存储） */
+function plainToParagraphHtml(text: string): string {
+  return text
+    .split(/\r?\n\s*\r?\n|\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => `<p>${escapeHtml(p)}</p>`)
+    .join('')
+}
+
+/**
+ * 把 AI 生成的大纲（分幕 + 章节细纲）追加写入项目大纲树：
+ * 幂等确保种子结构后，在 root 下依次创建 act，并在各 act 下创建 chapter（order 续排，不影响已有节点）。
+ */
+export async function applyGeneratedOutline(
+  projectId: string,
+  plan: GeneratedOutlinePlan,
+): Promise<{ acts: number; chapters: number }> {
+  await ensureOutlineSeed(projectId)
+  const nodes = await outlineRepo.byProject(projectId)
+  const root = nodes.find((n) => n.type === 'root')
+  if (!root) return { acts: 0, chapters: 0 }
+
+  let actOrder = nodes.filter((n) => n.parentId === root.id).reduce((max, n) => Math.max(max, n.order), -1) + 1
+  let createdActs = 0
+  let createdChapters = 0
+
+  for (const act of plan.acts) {
+    const actNode = createEntity<OutlineNode>(projectId, {
+      parentId: root.id,
+      type: 'act',
+      title: act.title.trim() || `第 ${createdActs + 1} 幕`,
+      content: act.summary?.trim() ? plainToParagraphHtml(act.summary.trim()) : '',
+      order: actOrder,
+      keyEventIds: [],
+      characterIds: [],
+      foreshadowingPlantedIds: [],
+      foreshadowingResolvedIds: [],
+    })
+    await outlineRepo.add(actNode)
+    actOrder += 1
+    createdActs += 1
+
+    let chapterOrder = 0
+    for (const chapter of act.chapters) {
+      const chapterNode = createEntity<OutlineNode>(projectId, {
+        parentId: actNode.id,
+        type: 'chapter',
+        title: chapter.title.trim() || `第 ${chapterOrder + 1} 章`,
+        content: chapter.content?.trim() ? plainToParagraphHtml(chapter.content.trim()) : '',
+        order: chapterOrder,
+        keyEventIds: [],
+        characterIds: [],
+        foreshadowingPlantedIds: [],
+        foreshadowingResolvedIds: [],
+      })
+      await outlineRepo.add(chapterNode)
+      chapterOrder += 1
+      createdChapters += 1
+    }
+  }
+
+  return { acts: createdActs, chapters: createdChapters }
+}
+
 /* ---------------- US-205 拖拽排序（Backlog） ---------------- */
 
 export type DropPosition = 'before' | 'after' | 'inside'

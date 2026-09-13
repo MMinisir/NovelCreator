@@ -7,6 +7,7 @@ import {
   getEffectiveSystemPrompt,
   withSystem,
   buildSynopsisPrompt,
+  buildOutlinePrompt,
   buildBioPrompt,
   buildRelationshipPrompt,
   buildPolishPrompt,
@@ -17,6 +18,7 @@ import {
 } from './prompts'
 import type {
   SynopsisInput,
+  OutlineInput,
   BioInput,
   RelationshipInput,
   PolishInput,
@@ -33,6 +35,7 @@ import type { Character, Location, Project, StoryEvent } from '@/types'
 
 export type {
   SynopsisInput,
+  OutlineInput,
   BioInput,
   RelationshipInput,
   PolishInput,
@@ -158,6 +161,73 @@ export function parseSynopsis(text: string): string[] {
     })
   }
   return out
+}
+
+/* ---------------- 大纲生成（分幕 + 章节细纲） ---------------- */
+
+export interface OutlinePlanChapter {
+  title: string
+  content?: string
+}
+
+export interface OutlinePlanAct {
+  title: string
+  summary?: string
+  chapters: OutlinePlanChapter[]
+}
+
+export interface OutlinePlan {
+  acts: OutlinePlanAct[]
+}
+
+/** 生成「分幕 + 章节细纲」大纲（输出 JSON；解析不到分幕时抛错提示重试） */
+export async function generateOutlinePlan(
+  input: OutlineInput,
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+  template?: string,
+): Promise<OutlinePlan> {
+  const text = await runPrompt(
+    { projectId: input.projectId, kind: 'outline', inputSummary: input.premise.slice(0, 30) },
+    withSystem(buildOutlinePrompt(input, template)),
+    config,
+    signal,
+  )
+  const plan = parseOutlinePlan(text)
+  if (plan.acts.length === 0) throw new Error('AI 未返回可解析的大纲结构，可调整故事核后重试')
+  return plan
+}
+
+/** 解析大纲 JSON（容忍 ```json 包裹与前后说明文字，字段名容错：volumes/name/summary/description） */
+export function parseOutlinePlan(text: string): OutlinePlan {
+  const json =
+    text.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() ??
+    text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1)
+  let obj: Record<string, unknown>
+  try {
+    obj = JSON.parse(json) as Record<string, unknown>
+  } catch {
+    return { acts: [] }
+  }
+  const rawActs = Array.isArray(obj.acts) ? obj.acts : Array.isArray(obj.volumes) ? (obj.volumes as unknown[]) : []
+  const acts: OutlinePlanAct[] = []
+  for (const item of rawActs as Array<Record<string, unknown>>) {
+    if (!item || typeof item !== 'object') continue
+    const title = String(item.title ?? item.name ?? '').trim()
+    const summary = String(item.summary ?? item.content ?? '').trim()
+    const rawChapters = Array.isArray(item.chapters) ? item.chapters : []
+    const chapters: OutlinePlanChapter[] = []
+    for (const ch of rawChapters as Array<Record<string, unknown>>) {
+      if (!ch || typeof ch !== 'object') continue
+      const cTitle = String(ch.title ?? ch.name ?? '').trim()
+      const cContent = String(ch.content ?? ch.summary ?? ch.description ?? '').trim()
+      if (!cTitle && !cContent) continue
+      chapters.push({ title: cTitle || '未命名章节', content: cContent })
+    }
+    if (!title && chapters.length === 0) continue
+    acts.push({ title: title || `第 ${acts.length + 1} 幕`, summary, chapters })
+  }
+  return { acts }
 }
 
 /* ---------------- US-803 人物小传 ---------------- */

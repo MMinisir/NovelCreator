@@ -25,6 +25,7 @@ export { getEffectiveSystemPrompt }
 
 export const AI_KIND_LABELS: Record<AIRequestKind, string> = {
   synopsis: '五句话梗概',
+  outline: '大纲生成',
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
@@ -69,6 +70,42 @@ export function buildSynopsisPrompt(input: SynopsisInput, template?: string): st
     partsLine: SYNOPSIS_PARTS.map((p) => `${p}：一句话`).join('\n'),
   }
   return template ? renderCustom(template, vars) : renderByKind('synopsis', vars)
+}
+
+/* ---------------- 大纲生成（分幕 + 章节细纲） ---------------- */
+
+export interface OutlineInput {
+  /** 故事核 / 一句话设定（必填） */
+  premise: string
+  /** 题材 / 类型 */
+  genre?: string
+  /** 分幕数量（默认 3） */
+  actCount?: number
+  /** 每幕章节数（默认 5） */
+  chaptersPerAct?: number
+  /** 风格 / 结构要求 */
+  style?: string
+  /** 已有五句话梗概文本（自动带入，可选） */
+  synopsisText?: string
+  /** 已有分幕标题（自动带入，避免重复） */
+  existingActs?: string
+  /** 项目世界观与人物速览（自动带入，可选） */
+  projectContext?: string
+  projectId?: string
+}
+
+export function buildOutlinePrompt(input: OutlineInput, template?: string): string {
+  const vars: Record<string, string> = {
+    premise: input.premise?.trim() ?? '',
+    actCount: String(input.actCount && input.actCount > 0 ? input.actCount : 3),
+    chaptersPerAct: String(input.chaptersPerAct && input.chaptersPerAct > 0 ? input.chaptersPerAct : 5),
+    genre: input.genre?.trim() ?? '',
+    synopsisText: input.synopsisText?.trim().slice(0, 1500) ?? '',
+    existingActs: input.existingActs?.trim().slice(0, 500) ?? '',
+    projectContext: input.projectContext?.trim().slice(0, 2500) ?? '',
+    style: input.style?.trim() ?? '',
+  }
+  return template ? renderCustom(template, vars) : renderByKind('outline', vars)
 }
 
 /* ---------------- US-803 人物小传 ---------------- */

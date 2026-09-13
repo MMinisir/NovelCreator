@@ -10,6 +10,7 @@ import {
   GripVertical,
   ListTree,
   Plus,
+  Sparkles,
   StickyNote,
 } from 'lucide-react'
 import { Badge, Button, EmptyState, cn } from '@/components/ui'
@@ -22,6 +23,7 @@ import {
   computeOutlineMove,
   ensureOutlineSeed,
   listForeshadowings,
+  stripHtml,
   type DropPosition,
 } from '@/services/outline'
 import type { Foreshadowing } from '@/types/meta'
@@ -29,6 +31,8 @@ import type { OutlineNode, OutlineNodeType } from '@/types/outline'
 import { StoryCoreCard, LoglineCard } from '@/components/outline/OutlineSetupCards'
 import { OutlineNodeEditor } from '@/components/outline/OutlineNodeEditor'
 import SynopsisGeneratorModal from '@/components/ai/SynopsisGeneratorModal'
+import OutlineGeneratorModal from '@/components/ai/OutlineGeneratorModal'
+import { buildProjectContextBrief } from '@/services/ai/contextBuilder'
 import { useProjectStore } from '@/stores/projectStore'
 
 const TYPE_ICON: Record<string, typeof FileText> = {
@@ -52,6 +56,7 @@ export default function OutlinePage() {
   const { items: characters } = useProjectEntityList(characterRepo, projectId)
   const project = useProjectStore((s) => s.currentProject())
   const [synopsisAIOpen, setSynopsisAIOpen] = useState(false) // US-802 AI 生成五句话
+  const [outlineAIOpen, setOutlineAIOpen] = useState(false) // AI 生成分幕 + 章节细纲
   const { items: events } = useProjectEntityList(eventRepo, projectId)
   const { items: locations } = useProjectEntityList(locationRepo, projectId)
   const { items: chapters } = useProjectEntityList(chapterRepo, projectId)
@@ -105,6 +110,39 @@ export default function OutlinePage() {
   }, [loaded, root, nodes, treeRoots, selectedId])
 
   const selected = nodes.find((n) => n.id === selectedId)
+
+  /** 大纲生成用的项目速览（世界观 / 人物 / 地点 / 事件） */
+  const projectContextText = useMemo(
+    () => (project ? buildProjectContextBrief({ project, characters, locations, events }) : undefined),
+    [project, characters, locations, events],
+  )
+
+  /** 已有分幕标题（提示 AI 不要重复） */
+  const existingActTitles = useMemo(
+    () =>
+      treeRoots
+        .filter((n) => n.type === 'act' && n.title)
+        .map((n) => n.title as string)
+        .join('、'),
+    [treeRoots],
+  )
+
+  /** 已有五句话梗概文本（生成大纲时保持一致） */
+  const synopsisText = useMemo(
+    () =>
+      synopsisItems
+        .map((i) => ({ title: i.title ?? '', text: stripHtml(i.content ?? '') }))
+        .filter((i) => i.text)
+        .map((i) => `${i.title}：${i.text}`)
+        .join('\n'),
+    [synopsisItems],
+  )
+
+  /** 预填故事核：故事核内容优先，其次项目一句话简介 */
+  const storyCoreText = useMemo(
+    () => (storyCore?.content ? stripHtml(storyCore.content) : (project?.tagline ?? '')),
+    [storyCore, project],
+  )
   const structNodeCount = nodes.filter((n) => n.type === 'act' || n.type === 'chapter' || n.type === 'scene' || n.type === 'free').length
 
   function toggleCollapse(id: string) {
@@ -241,6 +279,15 @@ export default function OutlinePage() {
         </div>
         <div className="flex items-center gap-2">
           {root && (
+            <Button
+              variant="primary"
+              onClick={() => setOutlineAIOpen(true)}
+              title="按故事核自动生成「分幕 + 章节细纲」，可预览编辑后写入"
+            >
+              <Sparkles className="size-4" /> AI 生成大纲
+            </Button>
+          )}
+          {root && (
             <>
               <Button variant="secondary" onClick={() => void handleAddTop('act')}>
                 <Plus className="size-4" /> 添加分幕 / 分卷
@@ -271,6 +318,22 @@ export default function OutlinePage() {
                 onClose={() => setSynopsisAIOpen(false)}
                 onApplied={() => {
                   setSynopsisAIOpen(false)
+                  void refresh()
+                }}
+              />
+            )}
+            {outlineAIOpen && projectId && (
+              <OutlineGeneratorModal
+                projectId={projectId}
+                defaultPremise={storyCoreText}
+                defaultGenre={project?.genre}
+                synopsisText={synopsisText}
+                existingActs={existingActTitles}
+                projectContext={projectContextText}
+                onClose={() => setOutlineAIOpen(false)}
+                onApplied={() => {
+                  setOutlineAIOpen(false)
+                  setCollapsed(new Set())
                   void refresh()
                 }}
               />

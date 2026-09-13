@@ -12,9 +12,10 @@ import { db } from '@/db/database'
 import type { PromptTemplate } from '@/types/meta'
 import { isoNow, uid } from '@/utils/common'
 
-/** 生成任务类型（与 AIRequestKind 的前 8 项一致） */
+/** 生成任务类型（与 AIRequestKind 的前 9 项一致） */
 export type TaskKind =
   | 'synopsis'
+  | 'outline'
   | 'characterBio'
   | 'relationship'
   | 'polish'
@@ -28,6 +29,7 @@ export type PromptTemplateKey = 'system' | TaskKind
 
 export const TASK_ORDER: TaskKind[] = [
   'synopsis',
+  'outline',
   'characterBio',
   'relationship',
   'polish',
@@ -39,6 +41,7 @@ export const TASK_ORDER: TaskKind[] = [
 
 export const TASK_LABELS: Record<TaskKind, string> = {
   synopsis: '五句话梗概',
+  outline: '大纲生成',
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
@@ -74,6 +77,38 @@ export const DEFAULT_PROMPT_CONTENT: Record<PromptTemplateKey, string> = {
 {{projectContext}}{{/projectContext}}
 
 每句控制在 30-60 字，共五句，直接输出。`,
+
+  /* 大纲生成 */
+  outline: `你是资深中文小说结构编辑。请为下面这部小说设计一套「分幕 + 章节细纲」大纲。
+只输出 JSON 对象（不要代码块、不要任何解释文字），结构如下：
+{
+  "acts": [
+    {
+      "title": "分幕 / 分卷标题，如：第一卷 青云山下",
+      "summary": "这一幕的核心冲突与推进目标，100 字内",
+      "chapters": [
+        { "title": "章节标题，如：第1章 入门考核", "content": "本章核心剧情，60-100 字：谁、在哪、发生什么、留下什么钩子" }
+      ]
+    }
+  ]
+}
+要求：共 {{actCount}} 幕，每幕约 {{chaptersPerAct}} 章；章节按顺序推进主线，每章都要有明确冲突与结尾钩子；人物行为与已有设定自洽；避免流水账式章节。
+
+【故事核 / 一句话设定】
+{{premise}}
+{{?genre}}
+【题材 / 类型】{{genre}}{{/genre}}
+{{?synopsisText}}
+【已有五句话梗概（需与之保持一致）】
+{{synopsisText}}{{/synopsisText}}
+{{?existingActs}}
+【已有分幕（不要重复，可顺承其后）】
+{{existingActs}}{{/existingActs}}
+{{?projectContext}}
+【世界观与人物参考】
+{{projectContext}}{{/projectContext}}
+{{?style}}
+【风格 / 结构要求】{{style}}{{/style}}`,
 
   /* US-803 人物小传 */
   characterBio: `请为下面这个小说人物撰写人物小传（约 {{words}} 字，可分段）。
@@ -239,6 +274,22 @@ export const PROMPT_TEMPLATE_DEFS: Record<PromptTemplateKey, PromptTemplateDef> 
       { name: 'style', desc: '风格要求（可选）' },
       { name: 'projectContext', desc: '项目已有设定参考（可选，自动截取 3000 字）' },
       { name: 'partsLine', desc: '输出格式的五句名称行（自动生成）' },
+    ],
+  },
+  outline: {
+    key: 'outline',
+    label: TASK_LABELS.outline,
+    description: '按故事核生成「分幕 + 章节细纲」两级大纲（输出 JSON，可预览编辑后写入大纲树）。',
+    category: 'task',
+    variables: [
+      { name: 'premise', desc: '故事核 / 一句话设定（必填）' },
+      { name: 'actCount', desc: '分幕数量' },
+      { name: 'chaptersPerAct', desc: '每幕章节数' },
+      { name: 'genre', desc: '题材 / 类型（可选）' },
+      { name: 'synopsisText', desc: '已有五句话梗概（自动带入，可选）' },
+      { name: 'existingActs', desc: '已有分幕标题（自动带入，避免重复）' },
+      { name: 'projectContext', desc: '世界观与人物速览（自动带入，可选）' },
+      { name: 'style', desc: '风格 / 结构要求（可选）' },
     ],
   },
   characterBio: {

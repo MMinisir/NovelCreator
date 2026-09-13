@@ -68,6 +68,7 @@ export interface Comment extends BaseEntity {
 /** AI 请求类型（用于 AI 历史记录与提示预览） */
 export type AIRequestKind =
   | 'synopsis'
+  | 'outline'
   | 'characterBio'
   | 'relationship'
   | 'polish'
