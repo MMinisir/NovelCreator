@@ -43,12 +43,12 @@
 | `services/merge.ts` | **共享合并（US-1002）**：`buildMergePlan`（本地 vs 远端 JSON 实体级差异：added/changed/localNewer/removed + 差异字段）、`applyMergePlan`（远端行写入时覆盖 projectId）、`defaultSelection` |
 | `components/settings/MergeWizardModal.tsx` | 合并向导：按实体类型分组勾选差异（默认勾选远端新增/更新），全选/清空、合并计数 |
 | `services/exportDoc.ts` | **导出扩展（US-701）**：`exportChaptersDocx`（动态 import `docx` 库，独立 chunk）、`chaptersToPrintHtml`+`printHtml`（打印对话框另存 PDF，A4 排版） |
-| `services/ai/prompts.ts` | **提示构建层**：`SYSTEM_PROMPT`、`withSystem`、`buildXxxPrompt`（9 个任务：梗概/大纲生成/小传/关系建议/润色/章节正文/一致性/体检/角色卡，均支持可选自定义模板参数）+ `AI_KIND_LABELS`；执行与「提示预览」共用同一构建函数，保证预览即所发 |
+| `services/ai/prompts.ts` | **提示构建层**：`SYSTEM_PROMPT`、`withSystem`、`buildXxxPrompt`（10 个任务：梗概/大纲生成/内容摘要/小传/关系建议/润色/章节正文/一致性/体检/角色卡，均支持可选自定义模板参数）+ `AI_KIND_LABELS`；执行与「提示预览」共用同一构建函数，保证预览即所发 |
 | `services/ai/log.ts` | **AI 请求日志**：`startRequestLog`/`finishRequestLog`（记录完整 messages、响应、错误、耗时、模型）、`listRequestLogs`/`deleteRequestLog`/`clearRequestLogs`/`summarizeLogs`；存 IndexedDB `ai_request_logs`（db version 3），不随项目导出，随项目删除清理 |
 | `components/ai/PromptPreviewModal.tsx` | 提示预览：展示 system（可折叠）+ user（可编辑）、复制提示、「用此提示生成」（编辑仅本次生效，走 `runCustomPrompt`） |
 | `components/ai/PasteImportModal.tsx` | **粘贴填充（AI 写回）**：把别处生成的内容粘贴导入，复用各任务解析管线填为可编辑结果；props：`title/description/placeholder/example`（示例可一键填入）+ `onImport(text) => Promise<string\|null>|string\|null`（返回 null 成功自动关闭，返回文案则在弹窗内展示）；「读取剪贴板」用 `navigator.clipboard.readText`（失败提示手动粘贴）；不走内置 AI、不写请求日志 |
-| `services/ai/templates.ts` | **提示词模板层**：系统提示 + 9 个任务 user 提示全部模板化（默认文本注册于 `DEFAULT_PROMPT_CONTENT`，键 `system/synopsis/outline/characterBio/relationship/polish/chapterContent/consistency/health/characterCard`）；渲染规则 `{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（变量为空整块移除、之后压缩多余空行）、未提供占位符原样保留；`renderByKind(kind,vars)`/`renderCustom(content,vars)` 统一渲染；`usePromptStore`（Zustand 全局，AppLayout 挂载时 `load()`）持 overrides/customs，覆盖与自定义持久化 prompt_templates 表（**projectId='' 代表全局**；custom 行 id 前缀 `custom:`，category=作用任务）；`getEffectiveSystemPrompt()` 返回生效系统提示；`customContentById(id)` 供入口选中自定义模板 |
-| `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 9 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
+| `services/ai/templates.ts` | **提示词模板层**：系统提示 + 10 个任务 user 提示全部模板化（默认文本注册于 `DEFAULT_PROMPT_CONTENT`，键 `system/synopsis/outline/summary/characterBio/relationship/polish/chapterContent/consistency/health/characterCard`）；渲染规则 `{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（变量为空整块移除、之后压缩多余空行）、未提供占位符原样保留；`renderByKind(kind,vars)`/`renderCustom(content,vars)` 统一渲染；`usePromptStore`（Zustand 全局，AppLayout 挂载时 `load()`）持 overrides/customs，覆盖与自定义持久化 prompt_templates 表（**projectId='' 代表全局**；custom 行 id 前缀 `custom:`，category=作用任务）；`getEffectiveSystemPrompt()` 返回生效系统提示；`customContentById(id)` 供入口选中自定义模板 |
+| `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
 | `components/ai/OutlineGeneratorModal.tsx` | **AI 生成大纲（分幕 + 章节细纲）**：大纲页头部「AI 生成大纲」；输入故事核（预填故事核/一句话简介）、题材、幕数与每幕章数（1-12 幕 / 1-20 章）、风格要求；自动带入五句话梗概、已有分幕标题（防重复）、项目速览；输出 JSON 经 `parseOutlinePlan` 容错解析后在弹窗内以**可编辑预览树**呈现（改标题/概要、增删幕与章节），确认后 `applyGeneratedOutline` **追加**写入大纲树（root 下建 act、act 下建 chapter，order 续排，核心剧情转 `<p>` 富文本）；同样支持粘贴填充 / 提示预览 / 模板选择（kind=`outline`） |
@@ -103,7 +103,7 @@
 - **AI 提示预览与请求历史（已交付）**：所有 AI 入口（梗概/小传/关系建议/润色/一致性深度检查/体检解读/角色卡）都提供「提示预览」——展示实际将发送的 system+user 提示，可就地编辑 user 内容后用「用此提示生成」发起请求（`runCustomPrompt`，kind 与所属项目照常记录）。每次请求都会写入 `ai_request_logs`（提示、响应、错误、耗时、模型、项目 id），历史在侧栏「AI 请求」页查看：状态统计、按时间倒序列表、展开看完整提示与响应、复制、单条删除、清空本项目（有确认）。日志存本机 IndexedDB，不随项目 JSON 导出，项目删除时级联清理。
 - **一句话生成角色卡（已交付）**：人物页「AI 生成角色卡」→ 输入一句话设定（可加补充要求）→ `generateCharacterCard` 让模型输出固定 JSON（含 name/aliases/importance/gender/age/appearance/personalityTags/desire/flaw/background/abilities/notes/currentState），`parseCharacterCard` 容错解析后填入可编辑表单，确认后创建人物并进入详情页。生成上下文自动带项目 `genre`、世界观 `worldSetting.freeText`+tags、已有人物名（提示避免重名）。`currentState` 落库为 `{ time:{type:'fuzzy',value:'初始'}, state }`；外貌/背景/备注经 `textToHtmlParagraphs` 存为富文本。
 - **AI 生成章节正文（已交付）**：写作区章节头部「AI 写正文」→ 填写「本章要写什么」（必填，可选目标字数与风格/视角）→ 自动带入本章大纲细纲、出场人物、上一章结尾与项目速览 → 生成结果可编辑，按「追加到末尾 / 替换整章」写入正文并自动保存（版本历史可找回旧内容）；同样支持粘贴填充、提示预览与自定义模板。
-- **AI 生成大纲（已交付）**：大纲页「AI 生成大纲」→ 填故事核（预填项目故事核/一句话简介）+ 题材 + 幕数/每幕章数 + 风格要求 → 自动带入五句话梗概、已有分幕、项目速览 → JSON 结果进入**可编辑预览树**（改标题概要、增删幕/章）→「写入大纲」追加为分幕与章节细纲节点（不影响已有结构）。章节较多时建议把 AI 最大输出 tokens 调到 4096+。
+- **AI 生成大纲（已交付）**：大纲页「AI 生成大纲」→ 填故事核（预填项目故事核/一句话简介，可点「AI 生成摘要」自动产出）+ 题材 + 幕数/每幕章数（**数量自由填写，不设上限**）+ 风格要求 → 自动带入五句话梗概、已有分幕、项目速览 → JSON 结果进入**可编辑预览树**（改标题概要、增删幕/章）→「写入大纲」追加为分幕与章节细纲节点（不影响已有结构）。章节较多时建议把 AI 最大输出 tokens 调到 4096+。
 - **全局搜索（已完善）**：顶栏入口 + `⌘K/Ctrl K` 快捷键；`services/search.ts` 纯函数计算（数据由面板打开时按需加载，关闭即释放，不全量常驻）。搜索范围默认当前项目，可切「全部项目」。结果按 `score` 排序：权重（项目名 6/名称标题 5/别名标签 3/正文 1）+ 命中位置（越靠前越高）。跳转：人物→人物详情页、章节→写作区 `?chapter=id`、批注→对应章节写作区，其余→对应模块列表页。
 - **体检报告 AI 解读（已交付）**：体检页「AI 解读」把总分/等级/五维摘要/系统建议交给 LLM，输出总体诊断 + 优先事项 + 下一步（需先配置 AI 服务）。
 - **版本历史（US-504 已交付）**：写作区编辑器头部「版本历史」入口。自动快照=保存后触发 `autoSnapshot`（内容未变或距上条自动版本 <2 分钟则跳过；自动版本上限 50 条，手动里程碑版本不裁剪）；弹窗左侧版本列表、右侧为该版本→当前正文的行 diff（+绿新增 / -红删除）；「回滚」会先把当前正文存为里程碑版本再恢复。首次进入可能还没有版本（写完一段并等待自动保存后出现）。
@@ -139,7 +139,12 @@
 
 ## 8. 最近变更
 
-### 本轮（AI 生成大纲）
+### 本轮（大纲规模自由填写 + 内容摘要）
+- 去掉大纲生成弹窗的「分幕数 ≤ 12 / 每幕章节数 ≤ 20」硬限制：输入框改为文本态（`actCountText`/`chaptersPerActText`），生成时用 `toPositiveInt` 解析（空/非法回退 3 / 5），不再截断用户输入；提示条动态显示「本次计划：N 幕 × 每幕 M 章（约 K 章）」，总数 > 24 时转为琥珀色提醒调大 AI 最大输出 tokens。
+- 新增第 10 个 AI 任务 `summary`（内容摘要）：`types/meta.ts` 加 kind；`templates.ts` 加默认模板与变量（words/focus/material/projectContext）+ 管理页「内容摘要」卡片；`prompts.ts` 加 `SummaryInput` + `buildSummaryPrompt`；`tasks.ts` 加 `generateSummary`（kind=`summary` 记日志）。
+- 大纲弹窗新增 **「AI 生成摘要」** 按钮（故事核输入框右上，独立 `useAITask<string>`，与大纲生成互不干扰）：把项目五句话梗概作为 material、世界观人物速览作为 projectContext，生成「主角 + 处境 + 核心冲突」的故事核摘要并填入输入框，用户可编辑后再生大纲。
+
+### 上轮（AI 生成大纲）
 - 新增第 9 个 AI 任务 `outline`：`types/meta.ts` 的 `AIRequestKind` 加项；`services/ai/templates.ts`（TaskKind/TASK_ORDER/TASK_LABELS「大纲生成」/默认 JSON 模板/变量说明）；`services/ai/prompts.ts`（`OutlineInput` + `buildOutlinePrompt`，变量 premise/actCount/chaptersPerAct/genre/synopsisText/existingActs/projectContext/style）；`services/ai/tasks.ts`（`generateOutlinePlan` + `parseOutlinePlan`，容忍 ```json 包裹与 volumes/name/summary/description 字段名容错）。
 - 落库：`services/outline.ts` 新增 `applyGeneratedOutline(projectId, plan)`（内部 `plainToParagraphHtml` 自行转 HTML，避免与 AI 层形成循环依赖）：`ensureOutlineSeed` 后在 root 下按序创建 `act`、各 act 下创建 `chapter`，order 续排且不影响已有节点，返回创建数量。
 - UI：新增 `components/ai/OutlineGeneratorModal.tsx`（可编辑预览树 + 追加写入）；`OutlinePage` 头部新增「AI 生成大纲」按钮（在 `root` 存在时显示），并组装 storyCore/tagline 预填、梗概文本、已有分幕标题、项目速览（`buildProjectContextBrief`）。
@@ -162,7 +167,7 @@
 ### 本轮（提示词管理页 + 提示模板渲染统一）
 - 新增 `services/ai/templates.ts`（模板注册/渲染/持久化）与全局页 `pages/PromptTemplatesPage.tsx`（路由 `/prompts`，顶栏「提示词管理」）：系统提示与 7 个任务提示均可在页面查看/覆盖/恢复默认，支持新增自定义模板（选作用任务），改动即时对所有项目生效。
 - `services/ai/prompts.ts` 重构为模板渲染（不改导出签名）：`buildXxxPrompt(input, template?)` 内部先算 vars 再走默认/覆盖/自定义模板；`SYSTEM_PROMPT` 常量保留为默认文案，`withSystem` 与 `runCustomPrompt` 的系统提示改取 `getEffectiveSystemPrompt()`（可被覆盖）；默认模板输出与历史逻辑等价 → 不改功能。
-- 模板语法：`{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（值为空整段不输出）、未知占位符保留原样（防误删导致生成缺数据）；9 个入口（梗概/大纲生成/小传/关系建议/润色/章节正文/一致性/体检/角色卡）与 AI 历史自建请求均可选用自定义模板（入口出现「模板」下拉，无自定义时不显示）。
+- 模板语法：`{{变量}}` 插值、`{{?变量}}…{{/变量}}` 条件块（值为空整段不输出）、未知占位符保留原样（防误删导致生成缺数据）；10 个任务（梗概/大纲生成/内容摘要/小传/关系建议/润色/章节正文/一致性/体检/角色卡）与 AI 历史自建请求均可选用自定义模板（入口出现「模板」下拉，无自定义时不显示；「内容摘要」当前由大纲弹窗按钮调用，模板可在管理页覆盖）。
 
 ### 上轮（AI 粘贴填充写回）
 - 新增：`components/ai/PasteImportModal.tsx`（通用粘贴导入弹窗）。

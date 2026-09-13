@@ -8,6 +8,7 @@ import {
   withSystem,
   buildSynopsisPrompt,
   buildOutlinePrompt,
+  buildSummaryPrompt,
   buildBioPrompt,
   buildRelationshipPrompt,
   buildPolishPrompt,
@@ -19,6 +20,7 @@ import {
 import type {
   SynopsisInput,
   OutlineInput,
+  SummaryInput,
   BioInput,
   RelationshipInput,
   PolishInput,
@@ -36,6 +38,7 @@ import type { Character, Location, Project, StoryEvent } from '@/types'
 export type {
   SynopsisInput,
   OutlineInput,
+  SummaryInput,
   BioInput,
   RelationshipInput,
   PolishInput,
@@ -228,6 +231,26 @@ export function parseOutlinePlan(text: string): OutlinePlan {
     acts.push({ title: title || `第 ${acts.length + 1} 幕`, summary, chapters })
   }
   return { acts }
+}
+
+/* ---------------- 内容摘要 ---------------- */
+
+/**
+ * 生成内容摘要（如故事核、作品简介）：
+ * 材料（梗概/正文/设定）与侧重由调用方组装，输出为一段纯文本。
+ */
+export async function generateSummary(
+  input: SummaryInput,
+  config: AIProviderConfig | null,
+  signal?: AbortSignal,
+  template?: string,
+): Promise<string> {
+  return runPrompt(
+    { projectId: input.projectId, kind: 'summary', inputSummary: input.focus ?? input.material?.slice(0, 30) },
+    withSystem(buildSummaryPrompt(input, template)),
+    config,
+    signal,
+  )
 }
 
 /* ---------------- US-803 人物小传 ---------------- */

@@ -26,6 +26,7 @@ export { getEffectiveSystemPrompt }
 export const AI_KIND_LABELS: Record<AIRequestKind, string> = {
   synopsis: '五句话梗概',
   outline: '大纲生成',
+  summary: '内容摘要',
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
@@ -106,6 +107,30 @@ export function buildOutlinePrompt(input: OutlineInput, template?: string): stri
     style: input.style?.trim() ?? '',
   }
   return template ? renderCustom(template, vars) : renderByKind('outline', vars)
+}
+
+/* ---------------- 内容摘要 ---------------- */
+
+export interface SummaryInput {
+  /** 待摘要的已有内容（梗概 / 正文片段 / 设定，可选） */
+  material?: string
+  /** 摘要用途与侧重（如「生成故事核：主角+处境+核心冲突」） */
+  focus?: string
+  /** 字数上限（默认 200） */
+  words?: number
+  /** 项目设定参考（可选） */
+  projectContext?: string
+  projectId?: string
+}
+
+export function buildSummaryPrompt(input: SummaryInput, template?: string): string {
+  const vars: Record<string, string> = {
+    words: String(input.words && input.words > 0 ? input.words : 200),
+    focus: input.focus?.trim() ?? '',
+    material: input.material?.trim().slice(0, 4000) ?? '',
+    projectContext: input.projectContext?.trim().slice(0, 3000) ?? '',
+  }
+  return template ? renderCustom(template, vars) : renderByKind('summary', vars)
 }
 
 /* ---------------- US-803 人物小传 ---------------- */

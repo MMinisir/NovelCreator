@@ -12,10 +12,11 @@ import { db } from '@/db/database'
 import type { PromptTemplate } from '@/types/meta'
 import { isoNow, uid } from '@/utils/common'
 
-/** 生成任务类型（与 AIRequestKind 的前 9 项一致） */
+/** 生成任务类型（与 AIRequestKind 的前 10 项一致） */
 export type TaskKind =
   | 'synopsis'
   | 'outline'
+  | 'summary'
   | 'characterBio'
   | 'relationship'
   | 'polish'
@@ -30,6 +31,7 @@ export type PromptTemplateKey = 'system' | TaskKind
 export const TASK_ORDER: TaskKind[] = [
   'synopsis',
   'outline',
+  'summary',
   'characterBio',
   'relationship',
   'polish',
@@ -42,6 +44,7 @@ export const TASK_ORDER: TaskKind[] = [
 export const TASK_LABELS: Record<TaskKind, string> = {
   synopsis: '五句话梗概',
   outline: '大纲生成',
+  summary: '内容摘要',
   characterBio: '人物小传',
   relationship: '关系建议',
   polish: '润色选中文本',
@@ -109,6 +112,19 @@ export const DEFAULT_PROMPT_CONTENT: Record<PromptTemplateKey, string> = {
 {{projectContext}}{{/projectContext}}
 {{?style}}
 【风格 / 结构要求】{{style}}{{/style}}`,
+
+  /* 内容摘要 */
+  summary: `请阅读下面的小说资料，输出一段凝练、可直接使用的「内容摘要」。
+要求：只输出摘要正文（不要标题、不要 Markdown 标记、不要解释或前后缀）；抓住主角、核心处境与主要冲突，交代故事走向与最大看点；语言连贯，读起来像成品作品简介；不要罗列条目。
+字数控制在 {{words}} 字以内。
+{{?focus}}
+【摘要用途与侧重】{{focus}}{{/focus}}
+{{?material}}
+【已有内容】
+{{material}}{{/material}}
+{{?projectContext}}
+【项目设定参考】
+{{projectContext}}{{/projectContext}}`,
 
   /* US-803 人物小传 */
   characterBio: `请为下面这个小说人物撰写人物小传（约 {{words}} 字，可分段）。
@@ -290,6 +306,18 @@ export const PROMPT_TEMPLATE_DEFS: Record<PromptTemplateKey, PromptTemplateDef> 
       { name: 'existingActs', desc: '已有分幕标题（自动带入，避免重复）' },
       { name: 'projectContext', desc: '世界观与人物速览（自动带入，可选）' },
       { name: 'style', desc: '风格 / 结构要求（可选）' },
+    ],
+  },
+  summary: {
+    key: 'summary',
+    label: TASK_LABELS.summary,
+    description: '把已有设定 / 梗概 / 正文材料压缩成一段凝练摘要（如故事核、作品简介）。',
+    category: 'task',
+    variables: [
+      { name: 'words', desc: '字数上限' },
+      { name: 'focus', desc: '摘要用途与侧重（可选）' },
+      { name: 'material', desc: '待摘要的已有内容（可选）' },
+      { name: 'projectContext', desc: '项目设定参考（可选）' },
     ],
   },
   characterBio: {

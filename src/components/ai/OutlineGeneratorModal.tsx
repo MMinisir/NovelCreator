@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { ClipboardPaste, Eye, Plus, Sparkles, Trash2 } from 'lucide-react'
-import { Badge, Button, Field, Input, Modal, Textarea } from '@/components/ui'
+import { Badge, Button, Field, Input, Modal, Textarea, cn } from '@/components/ui'
 import { useAITask } from '@/hooks/useAITask'
 import { loadAIConfig } from '@/services/ai/config'
 import {
   generateOutlinePlan,
+  generateSummary,
   parseOutlinePlan,
   runCustomPrompt,
   type OutlinePlan,
@@ -17,8 +18,11 @@ import PromptPreviewModal from './PromptPreviewModal'
 import PasteImportModal from './PasteImportModal'
 import PromptTemplatePicker from './PromptTemplatePicker'
 
-const MAX_ACTS = 12
-const MAX_CHAPTERS_PER_ACT = 20
+/** 输入框文本 → 正整数（空/非法时回退默认值；不设上限，由用户自行决定规模） */
+function toPositiveInt(text: string, fallback: number): number {
+  const n = Number.parseInt(text, 10)
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
 
 /**
  * AI 生成大纲（分幕 + 章节细纲）：
@@ -50,14 +54,16 @@ export default function OutlineGeneratorModal({
 }) {
   const [premise, setPremise] = useState(defaultPremise ?? '')
   const [genre, setGenre] = useState(defaultGenre ?? '')
-  const [actCount, setActCount] = useState(3)
-  const [chaptersPerAct, setChaptersPerAct] = useState(5)
+  const [actCountText, setActCountText] = useState('3')
+  const [chaptersPerActText, setChaptersPerActText] = useState('5')
   const [style, setStyle] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pasteOpen, setPasteOpen] = useState(false)
   const [tplId, setTplId] = useState('')
   const [applying, setApplying] = useState(false)
   const { loading, error, setError, result: plan, setResult, run, cancel } = useAITask<OutlinePlan>()
+  /** 独立摘要任务：用于「AI 生成摘要」填充故事核，与大纲生成互不干扰 */
+  const summaryTask = useAITask<string>()
 
   const totalChapters = plan?.acts.reduce((sum, a) => sum + a.chapters.length, 0) ?? 0
 
@@ -97,7 +103,28 @@ export default function OutlineGeneratorModal({
     }))
   }
 
+  const actCount = toPositiveInt(actCountText, 3)
+  const chaptersPerAct = toPositiveInt(chaptersPerActText, 5)
+  const plannedChapters = actCount * chaptersPerAct
   const promptInput = { premise, genre, actCount, chaptersPerAct, style, synopsisText, existingActs, projectContext }
+
+  /** 依据项目世界观 / 人物 / 已有梗概生成「故事核」摘要并填入输入框 */
+  async function handleGenerateSummary() {
+    const data = await summaryTask.run((signal) =>
+      generateSummary(
+        {
+          focus: '生成用于后续大纲设计的「故事核 / 一句话设定」：主角 + 处境 + 核心冲突，一句话到两句话',
+          words: 120,
+          material: synopsisText,
+          projectContext,
+          projectId,
+        },
+        loadAIConfig(),
+        signal,
+      ),
+    )
+    if (data?.trim()) setPremise(data.trim())
+  }
 
   async function handleGenerate(custom?: { userText: string; systemText: string }) {
     if (!custom && !premise.trim()) {
@@ -199,35 +226,52 @@ export default function OutlineGeneratorModal({
         <PromptTemplatePicker kind="outline" value={tplId} onChange={setTplId} />
 
         <Field label="故事核 / 一句话设定" required hint="越具体越好：主角 + 处境 + 核心冲突，如“被逐出师门的剑客为查明灭门真相重入江湖”">
-          <Textarea
-            rows={3}
-            value={premise}
-            onChange={(e) => setPremise(e.target.value)}
-            placeholder="一句话说明这本书要讲什么"
-            autoFocus
-          />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {summaryTask.loading && (
+                <Button size="sm" variant="ghost" onClick={summaryTask.cancel}>
+                  停止
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="subtle"
+                loading={summaryTask.loading}
+                onClick={() => void handleGenerateSummary()}
+                title="依据项目世界观、人物与已有梗概自动生成故事核摘要"
+              >
+                <Sparkles className="size-3.5" /> AI 生成摘要
+              </Button>
+            </div>
+            <Textarea
+              rows={3}
+              value={premise}
+              onChange={(e) => setPremise(e.target.value)}
+              placeholder="一句话说明这本书要讲什么（也可点上方「AI 生成摘要」自动生成）"
+              autoFocus
+            />
+            {summaryTask.error && <p className="text-xs text-red-600">{summaryTask.error}</p>}
+          </div>
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
           <Field label="题材 / 类型">
             <Input value={genre} onChange={(e) => setGenre(e.target.value)} placeholder="如 玄幻" />
           </Field>
-          <Field label="分幕数">
+          <Field label="分幕数" hint="可自定义（如 3 / 5 / 10）">
             <Input
               type="number"
               min={1}
-              max={MAX_ACTS}
-              value={actCount}
-              onChange={(e) => setActCount(Math.min(MAX_ACTS, Math.max(1, Number(e.target.value) || 3)))}
+              value={actCountText}
+              onChange={(e) => setActCountText(e.target.value)}
             />
           </Field>
-          <Field label="每幕章节数">
+          <Field label="每幕章节数" hint="可自定义；总数越大越要注意输出长度">
             <Input
               type="number"
               min={1}
-              max={MAX_CHAPTERS_PER_ACT}
-              value={chaptersPerAct}
-              onChange={(e) => setChaptersPerAct(Math.min(MAX_CHAPTERS_PER_ACT, Math.max(1, Number(e.target.value) || 5)))}
+              value={chaptersPerActText}
+              onChange={(e) => setChaptersPerActText(e.target.value)}
             />
           </Field>
           <Field label="风格 / 结构要求" hint="如 快节奏、单主角、每章一个钩子">
@@ -235,15 +279,24 @@ export default function OutlineGeneratorModal({
           </Field>
         </div>
 
-        <p className="rounded-xl bg-stone-50 px-3 py-2 text-xs text-stone-500">
-          已自动带入：{[
+        <p
+          className={cn(
+            'rounded-xl px-3 py-2 text-xs',
+            plannedChapters > 24 ? 'bg-amber-50 text-amber-700' : 'bg-stone-50 text-stone-500',
+          )}
+        >
+          本次计划：{actCount} 幕 × 每幕 {chaptersPerAct} 章（约 {plannedChapters} 章）。已自动带入：
+          {[
             synopsisText ? '五句话梗概' : '',
             existingActs ? '已有分幕' : '',
             projectContext ? '世界观与人物速览' : '',
           ]
             .filter(Boolean)
             .join('、') || '（暂无）'}
-          。章节较多时若被截断，请在「项目设置 → AI 服务配置」把最大输出 tokens 调到 4096 以上。
+          。
+          {plannedChapters > 24
+            ? '章节较多，请先在「项目设置 → AI 服务配置」把最大输出 tokens 调到 4096 以上，否则返回内容可能被截断。'
+            : '若返回内容被截断，可在「项目设置 → AI 服务配置」调大最大输出 tokens。'}
         </p>
 
         {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

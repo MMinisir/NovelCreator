@@ -69,6 +69,7 @@ export interface Comment extends BaseEntity {
 export type AIRequestKind =
   | 'synopsis'
   | 'outline'
+  | 'summary'
   | 'characterBio'
   | 'relationship'
   | 'polish'
