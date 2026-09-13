@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { List, type ListImperativeAPI, type RowComponentProps } from 'react-window'
-import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, Info } from 'lucide-react'
+import { Anchor, ArrowDown, ArrowUp, CalendarClock, Clock, GanttChart, Info, LayoutList } from 'lucide-react'
 import { Badge, Button, EmptyState, Select, cn } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
@@ -18,6 +18,7 @@ import {
   type ManualWrite,
   type TimelineItem,
 } from '@/utils/timeline'
+import TimelineGantt from '@/components/timeline/TimelineGantt'
 import type { CharacterStateKind, StoryEvent } from '@/types'
 
 /** 状态变化徽标配色（与人物详情状态历史一致） */
@@ -63,6 +64,7 @@ export default function TimelinePage() {
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [showForeshadowings, setShowForeshadowings] = useState(true) // US-602 伏笔预期回收节点开关
   const [busy, setBusy] = useState(false)
+  const [view, setView] = useState<'list' | 'gantt'>('list') // US-304 扩展：列表 / 甘特图视图
   const listRef = useRef<ListImperativeAPI | null>(null)
 
   const charById = useMemo(() => {
@@ -172,6 +174,27 @@ export default function TimelinePage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="inline-flex rounded-full border border-stone-200 bg-white p-0.5">
+            {(
+              [
+                { key: 'list', label: '列表', icon: LayoutList },
+                { key: 'gantt', label: '甘特图', icon: GanttChart },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setView(opt.key)}
+                className={cn(
+                  'inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1 text-xs font-medium transition-colors',
+                  view === opt.key ? 'bg-violet-700 text-white' : 'text-stone-500 hover:text-violet-700',
+                )}
+              >
+                <opt.icon className="size-3.5" />
+                {opt.label}
+              </button>
+            ))}
+          </div>
           <Link to="../foreshadowing" className="text-sm font-medium text-sky-600 hover:text-sky-800">
             伏笔管理 <span aria-hidden>→</span>
           </Link>
@@ -263,6 +286,14 @@ export default function TimelinePage() {
           icon={<CalendarClock className="size-6" />}
           title="没有匹配的事件"
           description="调整筛选条件，或切换回全局视图。"
+        />
+      ) : view === 'gantt' ? (
+        <TimelineGantt
+          columns={rows.filter((r) => r.kind === 'event')}
+          characters={characters}
+          locations={locations}
+          charName={charName}
+          locName={locName}
         />
       ) : (
         <>

@@ -51,6 +51,7 @@
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
+| `components/timeline/TimelineGantt.tsx` | **时间线甘特视图**：X 轴=筛选后事件序列（列头 序号+时间标签，最多 150 列），Y 轴=人物/地点泳道，色点=参与/发生（事件类型实心色），横条=活跃区间，点击列头或色点看详情条；左侧与表头 sticky、双向滚动、类型图例 |
 | `components/ai/OutlineGeneratorModal.tsx` | **AI 生成大纲（分幕 + 章节细纲）**：大纲页头部「AI 生成大纲」；输入故事核（预填故事核/一句话简介）、题材、幕数与每幕章数（1-12 幕 / 1-20 章）、风格要求；自动带入五句话梗概、已有分幕标题（防重复）、项目速览；输出 JSON 经 `parseOutlinePlan` 容错解析后在弹窗内以**可编辑预览树**呈现（改标题/概要、增删幕与章节），确认后 `applyGeneratedOutline` **追加**写入大纲树（root 下建 act、act 下建 chapter，order 续排，核心剧情转 `<p>` 富文本）；同样支持粘贴填充 / 提示预览 / 模板选择（kind=`outline`） |
 | `pages/project/AIHistoryPage.tsx` | AI 请求历史页（路由 `/projects/:id/ai-log`，侧栏「AI 请求」）：统计 + 列表 + 展开看完整提示/响应/错误、复制、删除、清空本项目 |
 | `components/ai/CharacterCardModal.tsx` | **一句话生成角色卡**：设定输入 → AI 产出结构化字段 → 表单逐项编辑 → `characterRepo.add` 创建人物并跳转详情（纯文本字段经 `textToHtmlParagraphs` 转富文本） |
@@ -114,7 +115,7 @@
 - **故事体检报告（Sprint 10 新增用户故事已交付）**：路由 `/projects/:id/health`（侧栏「体检报告」），`services/health.ts` 纯函数计算：伏笔回收（回收率为主，缺锚点/超 30 天扣分）、人物弧光（主要人物 desire/flaw/弧光阶段/当前状态四项 25 分制）、时间线连贯（事件参与者/地点/非模糊时间占比）、设定一致性（严重 -8/提示 -3/提醒 -1）、章节进度（完成率 60% + 均字达标 40%）；加权总分 + 等级 + 去重建议（按维度低分优先）。
 - **导出扩展（US-701 DOCX/PDF 已交付）**：写作区头部「导出 Word」→ `docx` 库生成（标题居中 + 每章另起页 + 首行缩进，动态 import 不拖首屏）；「导出 PDF」→ 生成 A4 排版打印 HTML 并 `window.print()`，在打印对话框选「另存为 PDF」（保留中文字体、零依赖）。Markdown 导出（Sprint 6）保持不变。
 - **移动端（US-902/903 已交付基础版）**：ProjectWorkspace 在 `md` 以下把左侧栏换成内容顶部横向滚动 tab（全部模块可达）；查看类页面网格本就是 `grid-cols-1 sm/lg/xl` 响应式（人物/大纲/时间线可直接查看）；写作区窄屏布局改为列向堆叠（章节列表在上、编辑器在下，列表可折叠），正文区 `overflow-wrap:anywhere` 防横向溢出，编辑区高度改为独立滚动容器（移动端 `h-[26rem]`、桌面端 `lg:h-[calc(100vh-23rem)]` 撑满视口）并支持打字机模式。时间线行为固定行高容器、内容 chips wrap，无整页横向滚动。
-- **时间线（Sprint 5+6 已交付）**：路由 `/projects/:id/timeline`（TimelinePage）。全局=全部事件；顶部 Select 选人=角色时间线（该人物事件+`CharacterState` 状态变化合并）。筛选=人物/地点/类型 chips + **「伏笔节点」开关（US-602，sky 色节点）**。排序=compareFlexibleTime 类别段内序；**模糊/相对事件行右侧 ▲▼ 在同类段内移动**（写 `time.sortOrder`，首次移动自动归一 0..n-1）。虚拟滚动=react-window v2 `List`。事件编辑仍在事件页。
+- **时间线（Sprint 5+6 已交付，含甘特视图）**：路由 `/projects/:id/timeline`（TimelinePage）。全局=全部事件；顶部 Select 选人=角色时间线（该人物事件+`CharacterState` 状态变化合并）。筛选=人物/地点/类型 chips + **「伏笔节点」开关（US-602，sky 色节点）**。排序=compareFlexibleTime 类别段内序；**模糊/相对事件行右侧 ▲▼ 在同类段内移动**（写 `time.sortOrder`，首次移动自动归一 0..n-1）。虚拟滚动=react-window v2 `List`。事件编辑仍在事件页。**视图切换（列表 / 甘特图）**：甘特视图（`components/timeline/TimelineGantt.tsx`）以当前筛选后的**事件顺序**为 X 轴（列头显示序号 + 时间标签，最多 150 列并提示缩小筛选）、以「按人物 / 按地点」泳道为 Y 轴；色点=该泳道参与/发生在该事件（按事件类型着色，点击看详情条：名称/时间/类型/星级/地点/参与者），紫色横条=活跃区间（首次→末次出现），左侧列名与表头 sticky，横向与纵向独立滚动，底部有类型图例。
 - **伏笔管理（Sprint 6 已交付）**：路由 `/projects/:id/foreshadowing`（ForeshadowingsPage）。列表状态筛选（全部/活跃/已回收/已废弃）+ 优先级/预期回收事件/相关人物展示；新建/编辑 Modal（描述必填；**预期回收事件**锚到事件 → 时间线节点）；删除走 `deleteForeshadowingCascade`（自动解除全部大纲节点 planted/resolved 引用）。大纲节点侧（OutlineNodeEditor）埋设/回收闭环仍可用。
 - **Markdown 导出（US-701）**：写作页头部「导出 Markdown」→ `chaptersToMarkdown` 组装（# 作品名 + 元信息 + 按顺序各章 `## 标题` + 状态/字数 + htmlToMarkdown 正文）。htmlToMarkdown 支持子集：h1-6/p/strong/em/code/s/del/a/br/img/blockquote/ul/ol(嵌套)/hr/pre。DOCX/PDF 留 Sprint 10。
 - **PWA/灵感碎片（US-901 简版）**：vite-plugin-pwa generateSW（autoUpdate，dist 产物 sw.js + registerSW.js + manifest.webmanifest；图标用 /favicon.svg 简版，未含 png 图标故移动端可能无安装提示——验收以离线可用为准）；灵感碎片页 `/projects/:id/ideas`（IdeaFragment: content/tags[]/kind:text，搜索、点标签筛选、删除）。
@@ -139,7 +140,11 @@
 
 ## 8. 最近变更
 
-### 本轮（大纲规模自由填写 + 内容摘要）
+### 本轮（时间线甘特图视图）
+- 新增 `components/timeline/TimelineGantt.tsx`：X 轴 = 当前筛选/排序后的事件序列（`rows.filter(kind==='event')`，列宽 56px、最多 150 列，超出提示缩小筛选），列头显示序号 + `timeLabel`，可点列头看事件详情；Y 轴泳道支持**按人物 / 按地点**切换（地点模式追加「未指定地点」泳道，仅显示有事件的实体）；色点按 `EVENT_DOT`（事件类型实心色）标记参与/发生，行内紫色横条表示活跃区间（首→末次出现）；左侧泳道名与表头 `sticky`，容器 `max-h-[560px] overflow-auto` 双向滚动；含类型图例与三态空提示（无事件 / 无泳道）。
+- `pages/project/TimelinePage.tsx`：标题右侧新增「列表 / 甘特图」视图切换（`LayoutList` / `GanttChart` 图标，默认列表），甘特视图复用现有筛选（人物/地点/类型/伏笔开关）与会话排序结果；`view === 'gantt'` 时渲染 `TimelineGantt`。
+
+### 上轮（大纲规模自由填写 + 内容摘要）
 - 去掉大纲生成弹窗的「分幕数 ≤ 12 / 每幕章节数 ≤ 20」硬限制：输入框改为文本态（`actCountText`/`chaptersPerActText`），生成时用 `toPositiveInt` 解析（空/非法回退 3 / 5），不再截断用户输入；提示条动态显示「本次计划：N 幕 × 每幕 M 章（约 K 章）」，总数 > 24 时转为琥珀色提醒调大 AI 最大输出 tokens。
 - 新增第 10 个 AI 任务 `summary`（内容摘要）：`types/meta.ts` 加 kind；`templates.ts` 加默认模板与变量（words/focus/material/projectContext）+ 管理页「内容摘要」卡片；`prompts.ts` 加 `SummaryInput` + `buildSummaryPrompt`；`tasks.ts` 加 `generateSummary`（kind=`summary` 记日志）。
 - 大纲弹窗新增 **「AI 生成摘要」** 按钮（故事核输入框右上，独立 `useAITask<string>`，与大纲生成互不干扰）：把项目五句话梗概作为 material、世界观人物速览作为 projectContext，生成「主角 + 处境 + 核心冲突」的故事核摘要并填入输入框，用户可编辑后再生大纲。
