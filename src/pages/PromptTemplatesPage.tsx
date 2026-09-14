@@ -221,7 +221,7 @@ export default function PromptTemplatesPage() {
   const kindDef = PROMPT_TEMPLATE_DEFS[kind]
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 lg:px-6">
+    <div className="mx-auto max-w-[1800px] px-4 py-6 lg:px-6">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-stone-900">提示词管理</h1>

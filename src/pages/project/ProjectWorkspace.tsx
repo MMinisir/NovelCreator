@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Link, NavLink, Outlet, useLocation, useParams } from 'react-router-dom'
+import { Link, NavLink, Outlet, useParams } from 'react-router-dom'
 import {
   Activity,
   ArrowLeft,
@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { useAutoBackup } from '@/hooks/useAutoBackup'
-import { EmptyState, cn } from '@/components/ui'
+import { EmptyState } from '@/components/ui'
 
 const MODULES = [
   { path: '', label: '项目概览', icon: LayoutDashboard, end: true },
@@ -42,9 +42,6 @@ const MODULES = [
 /** 项目工作台：二级导航 + 内容区（设计文档 §6.1） */
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>()
-  const { pathname } = useLocation()
-  /** 写作区需要更宽的可用面积（分屏 + 章节列表并存），单独放宽容器 */
-  const isWriting = pathname.endsWith('/writing')
   const loadProjects = useProjectStore((s) => s.loadProjects)
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
   const project = useProjectStore((s) => s.getProject(projectId ?? ''))
@@ -79,12 +76,7 @@ export default function ProjectWorkspace() {
   }
 
   return (
-    <div
-      className={cn(
-        'mx-auto flex flex-col gap-6 px-4 py-4 lg:flex-row lg:gap-8 lg:px-6',
-        isWriting ? 'max-w-[1800px]' : 'max-w-7xl',
-      )}
-    >
+    <div className="mx-auto flex max-w-[1800px] flex-col gap-6 px-4 py-4 lg:flex-row lg:gap-8 lg:px-6">
       <aside className="hidden w-52 shrink-0 md:block">
         <Link
           to="/projects"

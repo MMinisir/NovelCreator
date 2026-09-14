@@ -95,7 +95,7 @@ export default function ProjectSettingsPage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto max-w-3xl space-y-5">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-stone-900">项目设置</h1>
@@ -116,7 +116,7 @@ export default function ProjectSettingsPage() {
       {/* 基本信息 */}
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-400">基本信息</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label="书名" required>
             <Input value={form.name} onChange={(e) => set('name', e.target.value)} required />
           </Field>
@@ -159,7 +159,7 @@ export default function ProjectSettingsPage() {
       {/* 创作模式 */}
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-400">创作模式与方法论</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="项目模板">
             <div className="flex h-9 items-center">
               <Badge color="violet">{PROJECT_TEMPLATE_LABELS[form.template]}</Badge>
@@ -210,7 +210,7 @@ export default function ProjectSettingsPage() {
       {/* 时间与章节预设 */}
       <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide text-stone-400">时间与章节预设</h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           <Field label="故事起始时间" hint="如 2024-03-15">
             <Input
               value={form.timeSetting.start ?? ''}
