@@ -7,7 +7,7 @@
 
 本地优先（IndexedDB）的中文小说创作设定管理与 AI 辅助写作工作台。纯前端 SPA，无后端。
 验收命令：`npm run build`（= `tsc -b` + vite build，须零错误）；开发 `npm run dev`。
-技术栈：React 18 + TS + Vite + Tailwind + Zustand + Dexie + TipTap（富文本）+ cytoscape（关系图，Sprint 4）+ **react-window v2**（时间线虚拟列表，Sprint 5，v2 自带类型、API=List/rowComponent/rowProps/listRef，勿装 @types/react-window v1）+ **vite-plugin-pwa v1.3**（Sprint 6，generateSW，产物 dist/sw.js）。
+技术栈：React 18 + TS + Vite + Tailwind + Zustand + Dexie + TipTap（富文本）+ cytoscape（关系图，Sprint 4）+ **react-window v2**（时间线虚拟列表，Sprint 5，v2 自带类型、API=List/rowComponent/rowProps/listRef，勿装 @types/react-window v1）+ **vite-plugin-pwa v1.3**（Sprint 6，generateSW，产物 dist/sw.js）+ **Electron 44 + electron-builder 26**（桌面版 exe 打包，见 §8 本轮变更）。
 
 ## 2. 目录地图（src/）
 
@@ -51,6 +51,7 @@
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
+| `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
 | `components/timeline/EventQuickEditModal.tsx` | **事件快速编辑**（时间线列表行铅笔按钮 / 甘特图详情条「编辑事件」调起）：只含常用字段（名称、1-5 星重要性、**情节张力 1-5（`Flame` 图标，再点同一档取消=未评估）**、发生时间 `FlexibleTimeEditor`、类型 chips、地点、参与者 `CharacterMultiSelect`），保存 `eventRepo.update` 后由页面局部 `setItems` 回写；footer 左侧提供「去事件页完整编辑 →」链接（描述/结果/伏笔在事件页维护） |
 | `components/timeline/TimelineGantt.tsx` | **时间线甘特视图**：X 轴=筛选后事件序列（列头 序号+时间标签，最多 150 列），Y 轴=人物/地点泳道，色点=参与/发生（事件类型实心色），横条=活跃区间，点击列头或色点看详情条；左侧与表头 sticky、双向滚动、类型图例；**情节张力带**（柱高=tension 1-5 + 玫瑰色折线连各柱顶，未评估显示灰点）与张力统计摘要 |
 | `components/ai/OutlineGeneratorModal.tsx` | **AI 生成大纲（分幕 + 章节细纲）**：大纲页头部「AI 生成大纲」；输入故事核（预填故事核/一句话简介）、题材、幕数与每幕章数（1-12 幕 / 1-20 章）、风格要求；自动带入五句话梗概、已有分幕标题（防重复）、项目速览；输出 JSON 经 `parseOutlinePlan` 容错解析后在弹窗内以**可编辑预览树**呈现（改标题/概要、增删幕与章节），确认后 `applyGeneratedOutline` **追加**写入大纲树（root 下建 act、act 下建 chapter，order 续排，核心剧情转 `<p>` 富文本）；同样支持粘贴填充 / 提示预览 / 模板选择（kind=`outline`） |
@@ -141,7 +142,17 @@
 
 ## 8. 最近变更
 
-### 本轮（情节张力字段 + 甘特起伏曲线）
+### 本轮（Electron 桌面版 exe 打包）
+- 桌面化适配（**Web 行为完全不变**）：
+  - `src/main.tsx`：`window.location.protocol === 'file:'` 时用 `HashRouter`，否则 `BrowserRouter`（Electron 以 file:// 加载，history 路由会 404）。
+  - `vite.config.ts`：改为函数式 `defineConfig(({ mode }) => …)`；`vite build --mode electron` 时 `base: './'`（file:// 需相对资源路径）且 `VitePWA({ disable: true })`（file:// 无法注册 SW）；Web 构建仍 `base: '/'` + 正常注入 SW。
+  - 新增 `electron/main.cjs`；`package.json` 增 `main`（electron/main.cjs）、`author`、electron-builder `build` 配置（nsis + portable，x64，输出 `release-desktop/`）。
+- 脚本：`npm run build:electron`（`tsc -b && vite build --mode electron`）、`npm run electron:dev`（构建后本机跑桌面窗口）、`npm run dist:exe`（= build:electron + `electron-builder --win`）。
+- 产物：`release-desktop/NovelCreator Setup 0.1.0.exe`（NSIS 安装版：可选目录、桌面/开始菜单快捷方式）、`NovelCreator 0.1.0.exe`（便携版）、`win-unpacked/`（免安装目录），约 113MB。
+- **打包坑（已复现并绕过）**：electron-builder 解压 Electron 用 `fs.rename(tmp → win-unpacked)`，Windows 下遇实时杀毒/文件锁会 `EPERM`。绕过：`build.electronDist: "node_modules/electron/dist"`（走纯拷贝）；该目录缺失时从 `%LOCALAPPDATA%\electron\Cache\*\electron-v<版本>-win32-x64.zip` 用 `7za x -o<目标> <zip>` 解压（解压不涉及 rename）。失败残留 `win-unpacked.tmp/` 需手动删除后重打包。
+- 其他：默认 Electron 图标（放 `build/icon.ico` ≥256×256 再打包即可替换）；桌面版数据在 Electron userData（`%APPDATA%\NovelCreator`），**与浏览器版互不相通**（迁移用项目 JSON 导出/导入）；外链走系统浏览器；`dependencies` 中的纯前端库会被 electron-builder 一并放入 asar（可移到 devDependencies 减小体积）。
+
+### 上轮（情节张力字段 + 甘特起伏曲线）
 - 数据结构：`StoryEvent` 新增可选字段 `tension?: number`（1 平缓 ~ 5 高潮，undefined = 未评估；普通字段免 DB 迁移）；`utils/timeline.ts` 的 `TimelineItem` 同步加 `tension` 并在 `buildTimelineItems` 中从事件带入。
 - 录入：`EventsPage` 事件表单「重要性」旁新增「情节张力」（`Flame` 图标 1-5，再点同一档取消，1 平缓→5 高潮），保存写 `tension: tension || undefined`；事件卡片左侧显示火焰 + 数值；`EventQuickEditModal`（时间线列表/甘特）同样支持张力编辑。
 - 可视化：`TimelineGantt` 表头下方新增**情节张力带** —— 每列按 `tension` 画柱（`TENSION_BAR`：1 淡蓝 / 2 蓝 / 3 琥珀 / 4 橙 / 5 玫红），SVG 折线连接各柱顶呈现起伏趋势（`tensionBarHeight` 统一柱高与折线口径，未评估列显示灰点且不参与折线），点击柱可选中事件；图例补充张力分级说明与「已评估数 / 平均张力 / 峰值事件」摘要；列表视图事件行也显示「张力 n」徽标。
