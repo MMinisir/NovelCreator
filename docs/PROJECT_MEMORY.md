@@ -142,7 +142,13 @@
 
 ## 8. 最近变更
 
-### 本轮（Electron 桌面版 exe 打包）
+### 本轮（全站宽容器：所有页面铺满）
+- `ProjectWorkspace` 容器统一为 `max-w-[1800px]`（原「仅 /writing 放宽、其它 max-w-7xl」的特例逻辑删除，随之移除 `useLocation`/`isWriting`/`cn` 依赖）→ 项目内**所有页面**（概览/人物/地点/事件/大纲/时间线/关系图/伏笔/灵感/一致性/体检/AI 请求/设置）与写作区一致铺满。
+- `ProjectListPage`（`max-w-7xl` → `max-w-[1800px]`）与 `PromptTemplatesPage`（`max-w-5xl` → `max-w-[1800px]`）同步放宽。
+- `ProjectSettingsPage` 去掉 `mx-auto max-w-3xl`，并在宽屏加分列：基本信息 `lg:grid-cols-3`、创作模式 `lg:grid-cols-4`、时间与章节预设 `lg:grid-cols-4`（避免超宽屏下输入框被拉得过长）。
+- 桌面安装包已重新打包（本机因 safe-delete 钩子拦截"清空已存在输出目录"，改用 `--config.directories.output=release-win`，**最新产物在 `release-win/`**；`release-desktop/` 为旧布局产物，可删）。
+
+### 上轮（Electron 桌面版 exe 打包）
 - 桌面化适配（**Web 行为完全不变**）：
   - `src/main.tsx`：`window.location.protocol === 'file:'` 时用 `HashRouter`，否则 `BrowserRouter`（Electron 以 file:// 加载，history 路由会 404）。
   - `vite.config.ts`：改为函数式 `defineConfig(({ mode }) => …)`；`vite build --mode electron` 时 `base: './'`（file:// 需相对资源路径）且 `VitePWA({ disable: true })`（file:// 无法注册 SW）；Web 构建仍 `base: '/'` + 正常注入 SW。
@@ -150,6 +156,7 @@
 - 脚本：`npm run build:electron`（`tsc -b && vite build --mode electron`）、`npm run electron:dev`（构建后本机跑桌面窗口）、`npm run dist:exe`（= build:electron + `electron-builder --win`）。
 - 产物：`release-desktop/NovelCreator Setup 0.1.0.exe`（NSIS 安装版：可选目录、桌面/开始菜单快捷方式）、`NovelCreator 0.1.0.exe`（便携版）、`win-unpacked/`（免安装目录），约 113MB。
 - **打包坑（已复现并绕过）**：electron-builder 解压 Electron 用 `fs.rename(tmp → win-unpacked)`，Windows 下遇实时杀毒/文件锁会 `EPERM`。绕过：`build.electronDist: "node_modules/electron/dist"`（走纯拷贝）；该目录缺失时从 `%LOCALAPPDATA%\electron\Cache\*\electron-v<版本>-win32-x64.zip` 用 `7za x -o<目标> <zip>` 解压（解压不涉及 rename）。失败残留 `win-unpacked.tmp/` 需手动删除后重打包。
+- **本机环境限制**：该 IDE 会话对 `fs.rm`/`Remove-Item` 注入了 safe-delete 钩子（依赖系统回收站），而本机回收站不可用 → 任何"清空已存在输出目录"的打包操作都会失败。对策：输出到**尚不存在的新目录**（`--config.directories.output=<新目录>`）或手动删除旧目录。`.gitignore` 用通配 `release*` 覆盖各输出目录。
 - 其他：默认 Electron 图标（放 `build/icon.ico` ≥256×256 再打包即可替换）；桌面版数据在 Electron userData（`%APPDATA%\NovelCreator`），**与浏览器版互不相通**（迁移用项目 JSON 导出/导入）；外链走系统浏览器；`dependencies` 中的纯前端库会被 electron-builder 一并放入 asar（可移到 devDependencies 减小体积）。
 
 ### 上轮（情节张力字段 + 甘特起伏曲线）
