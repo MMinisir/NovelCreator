@@ -53,7 +53,7 @@
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
 | `scripts/dev-desktop.mjs` | **桌面开发模式**（`npm run dev:exe`）：**默认** `tsc -b` + `vite build --watch --mode electron` 持续重建 dist → Electron 以 **file://** 加载（与打包版**共用同一份 IndexedDB 数据**，能看到真实项目），产物变化自动刷新窗口（主进程 `NC_RELOAD_ON_BUILD`）；`npm run dev:exe -- --hmr` 改为 Vite dev server + `VITE_DEV_SERVER_URL`（真 HMR，但数据与桌面版隔离）；退出时按进程树清理（Windows `taskkill /T /F`）|
 | `scripts/build-desktop.mjs` | **桌面版一键打包**（`npm run dist:exe`）：自动升版本号（patch/minor/major/指定）→ electron 模式建前端 → electron-builder 出**单文件便携版**（输出到系统临时目录）→ 复制为 `release-desktop/NovelCreator-v<version>.exe` → 清理旧版本与历史 `release*` 目录。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
-| `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage；界面字号、写作区字号、工作区侧栏是否收起 sidebarCollapsed）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
+| `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage；外观主题 theme（light/dark，默认 light）、界面字号、写作区字号、侧栏收起 sidebarCollapsed）；`applyTheme()` 在 `<html>` 上切 `.dark` 类并设 `color-scheme`，由 `main.tsx` 启动 `load()` 在首帧前应用 |：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
 | `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
 | `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
 | `components/timeline/EventQuickEditModal.tsx` | **事件快速编辑**（时间线列表行铅笔按钮 / 甘特图详情条「编辑事件」调起）：只含常用字段（名称、1-5 星重要性、**情节张力 1-5（`Flame` 图标，再点同一档取消=未评估）**、发生时间 `FlexibleTimeEditor`、类型 chips、地点、参与者 `CharacterMultiSelect`），保存 `eventRepo.update` 后由页面局部 `setItems` 回写；footer 左侧提供「去事件页完整编辑 →」链接（描述/结果/伏笔在事件页维护） |
@@ -146,7 +146,13 @@
 
 ## 8. 最近变更
 
-### 本轮（桌面开发模式 dev:exe：与打包版共用数据 + 保存即重建刷新）
+### 本轮（主题系统：浅色 / 暗色）
+- **实现方式（关键，不要改回逐组件写 dark:）**：利用 Tailwind v4「工具类引用 CSS 变量」的特性——在 `index.css` 的 `html.dark { … }` 里重定义 `--color-stone-*`、`--color-violet-*`、`--color-red/emerald/amber/sky/rose/orange-*` 等变量即可整站换肤，组件一行都不用改。灰阶 `stone` 整体反转（浅底↔深底、深字↔亮字）；彩色只反转「浅底 / 深字」档（50–300 与 700–900），主色档 500–700 保持（主按钮、进度条、色块、卡片封面）。**以后新增配色直接用这些常规档位即可自动适配暗色。**
+- **必须单独覆盖的例外**（都写在 index.css 主题区块内）：① `.bg-white` / `.bg-white\/90` / `.bg-white\/95` → 深色表面（**不能**改 `--color-white`，否则 `text-white` 会变成深色）；② `.bg-stone-900\/40` → Modal 遮罩（文字用的 stone-900 已被反转成亮色，遮罩需单独压深）；③ `.text-violet-600`/`.text-violet-700`/`.text-red-600`/`.text-emerald-600`/`.text-sky-600` → 深底上对比度不足，作为文字时提亮；④ `body` 的底色与默认文字（用的是 `--color-ink-50/900`，不走 Tailwind 灰阶）；⑤ 滚动条颜色；⑥ `.prose-editor` / `.rich-display` 中原先硬编码的 rgb() 色改为引用变量（浅色下等价，暗色自动适配）。
+- **切换入口**：顶栏右侧月亮/太阳按钮（`AppLayout`，一键切换）+ 设置页「外观主题」卡片（`AppSettingsPage`，浅色/暗色）。状态存 `settingsStore.theme`（localStorage `novel-creator.theme.v1`），`main.tsx` 启动时 `load()` 在首帧前应用避免闪烁；设置页「恢复默认」回到浅色。已知小瑕疵：Electron 窗口 `backgroundColor` 固定浅色，暗色下启动瞬间会闪一下白（无害）。
+- **UI 自查手段**：`NC_SCREENSHOT=<png路径> node node_modules/electron/cli.js .` → 主进程等窗口渲染完自动 `capturePage()` 截图并退出（`electron/main.cjs` 中的开关，仅该环境变量存在时生效），可用来核对界面/主题效果。
+
+### 上轮（桌面开发模式 dev:exe：与打包版共用数据 + 保存即重建刷新）
 - 新增 `npm run dev:exe`（`scripts/dev-desktop.mjs`）。**默认模式**：先 `tsc -b`（类型检查），再 `vite build --watch --mode electron` 持续重建 `dist/`；产物就绪后启动 Electron —— 主进程以 **file://** 加载 dist，并在 `NC_RELOAD_ON_BUILD=1` 时 `fs.watch(dist)`、产物变化后 `reloadIgnoringCache()` 自动刷新窗口（保存代码约 1~2 秒生效）。
 - **为什么默认不用 dev server**：dev server 的 origin 是 `http://localhost:5173`，其 IndexedDB 与打包版（`file://`）**互不相通**（实测 `%APPDATA%\novel-creator\IndexedDB` 下只有 `file__0.indexeddb.leveldb`）——用 dev server 开发会打开一个**空库**、看不到真实项目数据。走 file:// 才能与桌面版共用同一份数据。
 - 真 HMR 仍保留：`npm run dev:exe -- --hmr`（Vite dev server 5173 + 自动开 DevTools，数据独立，适合纯 UI 调试）。

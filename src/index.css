@@ -70,17 +70,17 @@ body {
   padding-left: 1.25rem;
 }
 .prose-editor blockquote {
-  border-left: 3px solid rgb(167 139 250);
+  border-left: 3px solid var(--color-violet-400);
   padding-left: 0.75rem;
   margin: 0.4rem 0;
-  color: rgb(87 83 78);
+  color: var(--color-stone-600);
 }
 .prose-editor hr {
   margin: 0.75rem 0;
-  border-top: 1px solid rgb(214 211 209);
+  border-top: 1px solid var(--color-stone-300);
 }
 .prose-editor a {
-  color: rgb(124 58 237);
+  color: var(--color-violet-600);
   text-decoration: underline;
 }
 
@@ -111,7 +111,119 @@ body {
   padding-left: 1.25rem;
 }
 .rich-display blockquote {
-  border-left: 3px solid rgb(167 139 250);
+  border-left: 3px solid var(--color-violet-400);
   padding-left: 0.75rem;
-  color: rgb(87 83 78);
+  color: var(--color-stone-600);
+}
+
+/* ============================ 主题：暗色（theme = 'dark'） ============================
+ * 原理：Tailwind v4 的工具类都引用 CSS 变量（如 `.bg-stone-100` → `background-color: var(--color-stone-100)`），
+ * 因此在 `html.dark` 作用域内重定义这些变量即可整站换肤，组件无需逐个写 dark: 变体。
+ * 规则：灰阶 stone 整体反转（浅底↔深底、深字↔亮字）；紫色与其它彩色只反转「浅底 / 深字」档，
+ *       主色档（500–700，用于主按钮与强调色块）保持原样。
+ * 例外单独覆盖（见下方）：卡片表面 bg-white、Modal 遮罩、深底上对比度不足的正文色。
+ */
+html.dark {
+  /* 让滚动条、输入框、下拉、日期选择等原生控件跟随暗色 */
+  color-scheme: dark;
+
+  /* 灰阶反转：背景与边框变深，文字变亮 */
+  --color-stone-50: #191715;
+  --color-stone-100: #232120;
+  --color-stone-200: #332f2b;
+  --color-stone-300: #443e37;
+  --color-stone-400: #8a8378;
+  --color-stone-500: #a9a29a;
+  --color-stone-600: #c8c2ba;
+  --color-stone-700: #ded9d1;
+  --color-stone-800: #ece8e2;
+  --color-stone-900: #f7f4f0;
+
+  /* 紫色：浅底/深字档反转；500–700 保持（主按钮、进度条、强调色块） */
+  --color-violet-50: #231736;
+  --color-violet-100: #33205a;
+  --color-violet-200: #48307d;
+  --color-violet-300: #6d4bc4;
+  --color-violet-400: #a78bfa;
+  --color-violet-800: #cdbcfb;
+  --color-violet-900: #e4dcfd;
+
+  /* 危险 / 成功 / 警示 / 信息 / 玫瑰 / 橙：浅底压深、深字提亮 */
+  --color-red-50: #2a1517;
+  --color-red-100: #3a1a1d;
+  --color-red-200: #58272b;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+
+  --color-emerald-50: #10231c;
+  --color-emerald-100: #143126;
+  --color-emerald-200: #1d4a39;
+  --color-emerald-700: #6ee7b7;
+  --color-emerald-800: #a7f3d0;
+
+  --color-amber-50: #2a2011;
+  --color-amber-100: #3a2c14;
+  --color-amber-200: #52401c;
+  --color-amber-300: #6d5524;
+  --color-amber-400: #fbbf24;
+  --color-amber-700: #fcd34d;
+  --color-amber-800: #fde68a;
+
+  --color-sky-50: #0f1e2b;
+  --color-sky-100: #143049;
+  --color-sky-200: #1d4568;
+  --color-sky-300: #2b5c8a;
+  --color-sky-400: #38bdf8;
+  --color-sky-700: #7dd3fc;
+  --color-sky-800: #bae6fd;
+
+  --color-rose-100: #3a1a22;
+  --color-rose-700: #fda4af;
+
+  --color-orange-100: #3a2412;
+  --color-orange-200: #55341a;
+  --color-orange-400: #fb923c;
+  --color-orange-700: #fdba74;
+}
+
+/* 页面底色与默认文字（body 用的是 --color-ink-50/900 变量，不走 Tailwind 灰阶） */
+html.dark body {
+  background-color: #151311;
+  color: var(--color-stone-800);
+}
+
+/* 卡片/面板表面：`text-white` 必须保持白色，因此不能改 --color-white，改为单独覆盖白色背景类 */
+html.dark .bg-white {
+  background-color: #221f1c;
+}
+html.dark .bg-white\/90 {
+  background-color: rgb(28 26 24 / 0.9);
+}
+html.dark .bg-white\/95 {
+  background-color: rgb(34 31 28 / 0.95);
+}
+
+/* Modal 遮罩：文字用的 stone-900 已被反转成亮色，这里把遮罩单独压深 */
+html.dark .bg-stone-900\/40 {
+  background-color: rgb(0 0 0 / 0.65);
+}
+
+/* 深底上对比度不足的正文色：600/700 档作背景时保持原样，作文字时提亮 */
+html.dark .text-violet-600,
+html.dark .text-violet-700 {
+  color: #b39dfb;
+}
+html.dark .text-red-600 {
+  color: #f87171;
+}
+html.dark .text-emerald-600 {
+  color: #34d399;
+}
+html.dark .text-sky-600 {
+  color: #38bdf8;
+}
+
+/* 滚动条 */
+html.dark * {
+  scrollbar-color: rgb(255 255 255 / 0.22) transparent;
 }

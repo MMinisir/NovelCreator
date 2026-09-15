@@ -14,6 +14,8 @@ const path = require('node:path')
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
 /** 桌面开发模式：dist 产物变化时自动刷新窗口 */
 const RELOAD_ON_BUILD = process.env.NC_RELOAD_ON_BUILD === '1'
+/** 仅用于 UI 自动化检查：设置该环境变量后，窗口渲染完成即截图保存并退出 */
+const SCREENSHOT_PATH = process.env.NC_SCREENSHOT
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -51,6 +53,22 @@ function createWindow() {
     win.webContents.openDevTools({ mode: 'detach' })
   } else {
     void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  }
+
+  // UI 自动化检查（不影响正常使用）：截图当前窗口后退出
+  if (SCREENSHOT_PATH) {
+    win.webContents.once('did-finish-load', () => {
+      setTimeout(() => {
+        win.webContents
+          .capturePage()
+          .then((image) => {
+            fs.writeFileSync(SCREENSHOT_PATH, image.toPNG())
+            console.log(`[screenshot] saved: ${SCREENSHOT_PATH}`)
+          })
+          .catch((err) => console.error(`[screenshot] failed: ${err}`))
+          .finally(() => app.quit())
+      }, 3000)
+    })
   }
 
   // 桌面开发模式（默认）：vite build --watch 持续重建 dist，这里监听产物变化自动刷新窗口。

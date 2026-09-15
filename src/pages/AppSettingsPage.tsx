@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react'
-import { RotateCcw, Type } from 'lucide-react'
+import { Moon, Palette, RotateCcw, Sun, Type } from 'lucide-react'
 import { Button, cn } from '@/components/ui'
 import AIConfigPanel from '@/components/ai/AIConfigPanel'
 import {
@@ -10,6 +10,7 @@ import {
   UI_FONT_MAX,
   UI_FONT_MIN,
   useSettingsStore,
+  type AppTheme,
 } from '@/stores/settingsStore'
 
 const UI_PRESETS = [
@@ -21,12 +22,19 @@ const UI_PRESETS = [
 
 const EDITOR_PRESETS = [14, 16, 18, 20, 24, 28]
 
-/** 全局设置页（不绑定项目）：界面字号 / 写作区字号 / AI 服务配置 */
+const THEME_OPTIONS: { value: AppTheme; label: string; icon: typeof Sun }[] = [
+  { value: 'light', label: '浅色', icon: Sun },
+  { value: 'dark', label: '暗色', icon: Moon },
+]
+
+/** 全局设置页（不绑定项目）：外观主题 / 界面字号 / 写作区字号 / AI 服务配置 */
 export default function AppSettingsPage() {
   const uiFontSize = useSettingsStore((s) => s.uiFontSize)
   const editorFontSize = useSettingsStore((s) => s.editorFontSize)
   const setUiFontSize = useSettingsStore((s) => s.setUiFontSize)
   const setEditorFontSize = useSettingsStore((s) => s.setEditorFontSize)
+  const theme = useSettingsStore((s) => s.theme)
+  const setTheme = useSettingsStore((s) => s.setTheme)
   const reset = useSettingsStore((s) => s.reset)
 
   return (
@@ -39,6 +47,34 @@ export default function AppSettingsPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        {/* 外观主题 */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm xl:col-span-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-400">
+            <Palette className="size-4" /> 外观主题
+          </h2>
+          <p className="mt-1 text-xs text-stone-400">整站配色方案，切换后立即生效并记住选择。</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {THEME_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setTheme(opt.value)}
+                className={cn(
+                  'flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm transition-colors',
+                  theme === opt.value
+                    ? 'border-violet-300 bg-violet-700 text-white'
+                    : 'border-stone-200 bg-white text-stone-600 hover:border-violet-300 hover:text-violet-700',
+                )}
+              >
+                <opt.icon className="size-4" /> {opt.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 rounded-lg bg-stone-50 px-3 py-2 text-xs text-stone-500">
+            主题偏好保存在本机（浏览器 localStorage / 桌面版本地数据），不影响项目数据；也可用顶栏右侧的月亮 / 太阳按钮一键切换。
+          </p>
+        </section>
+
         {/* 字号 */}
         <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-stone-400">

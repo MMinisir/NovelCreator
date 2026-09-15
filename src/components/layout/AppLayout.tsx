@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import { BookOpenText, Search, Settings, TextCursorInput } from 'lucide-react'
+import { BookOpenText, Moon, Search, Settings, Sun, TextCursorInput } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { usePromptStore } from '@/services/ai/templates'
+import { useSettingsStore } from '@/stores/settingsStore'
 import GlobalSearchModal from '@/components/search/GlobalSearchModal'
 
 const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent)
@@ -11,6 +12,8 @@ const SHORTCUT = IS_MAC ? '⌘K' : 'Ctrl K'
 /** 全局布局：顶栏 + 主内容区（设计文档 §6.1 顶部工具栏） */
 export default function AppLayout() {
   const currentProject = useProjectStore((s) => s.currentProject())
+  const theme = useSettingsStore((s) => s.theme)
+  const toggleTheme = useSettingsStore((s) => s.toggleTheme)
   const [searchOpen, setSearchOpen] = useState(false)
 
   // 全局搜索快捷键：Cmd/Ctrl + K
@@ -50,6 +53,16 @@ export default function AppLayout() {
           )}
 
           <div className="ml-auto flex items-center gap-2">
+            {/* 外观主题一键切换（浅色 / 暗色） */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? '切换到浅色主题' : '切换到暗色主题'}
+              aria-label={theme === 'dark' ? '切换到浅色主题' : '切换到暗色主题'}
+              className="cursor-pointer rounded-full p-2 text-stone-500 transition-colors hover:bg-stone-100 hover:text-violet-700"
+            >
+              {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+            </button>
             <Link
               to="/prompts"
               className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-600 transition-colors hover:border-violet-300 hover:text-violet-700"
