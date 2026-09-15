@@ -51,6 +51,7 @@
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
+| `scripts/build-desktop.mjs` | **桌面版一键打包**（`npm run dist:exe`）：自动升版本号（patch/minor/major/指定）→ electron 模式建前端 → electron-builder 出**单文件便携版**（输出到系统临时目录）→ 复制为 `release-desktop/NovelCreator-v<version>.exe` → 清理旧版本与历史 `release*` 目录。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
 | `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
 | `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
 | `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
@@ -144,7 +145,13 @@
 
 ## 8. 最近变更
 
-### 本轮（字号设置 + AI 配置迁到全局设置）
+### 本轮（一键打包：单文件 exe + 自动版本号 + 清理旧版本）
+- 新增 `scripts/build-desktop.mjs`（`npm run dist:exe`）五步流程：① 自动升级版本号（默认 patch，支持 `--minor` / `--major` / `--version=x.y.z`，写回 package.json）② electron 模式构建前端 ③ `electron-builder --win portable` 生成**单文件便携版 exe**（输出到系统临时目录，天然规避"清空已存在输出目录"类失败）④ 复制为 `release-desktop/NovelCreator-v<version>.exe` ⑤ 清理其它 `release*` 历史目录、旧版本 exe 与中间产物（删除失败只告警不中断，兼容被安全策略接管删除的环境）。
+- 脚本内的子进程一律用 `node <node_modules/<pkg>/<bin>>` 方式执行（`binEntry()` 从各包 package.json 的 `bin` 字段解析）：Windows + Node ≥20 禁止 `spawnSync('npm.cmd')`（`EINVAL`），同时避免 `NovelCreator-v${version}.${ext}` 这类含宏参数被 shell 转义。
+- `package.json`：`win.target` 只保留 `portable`（不再产出 NSIS 安装包 / win-unpacked），`portable.artifactName = NovelCreator-v${version}.${ext}`，新增 `dist:exe:minor` / `dist:exe:major`。
+- 实测：`0.1.0 → 0.1.2`，最终目录只剩 `release-desktop/NovelCreator-v0.1.2.exe`（99.7 MB），历史 `release/`、`release-win/`、`release-app/` 均被自动清除。
+
+### 上轮（字号设置 + AI 配置迁到全局设置）
 - 新增全局设置 store `stores/settingsStore.ts`（localStorage：`novel-creator.ui-font-size.v1` / `novel-creator.editor-font-size.v1`）与全局设置页 `pages/AppSettingsPage.tsx`（路由 `/settings`，顶栏新增「设置」入口）：
   - **界面字号** 14–20px：改 `<html>` 根字号（Tailwind 基于 rem → 整站文字与间距按比例缩放），main.tsx 在首帧前 `load()` 应用避免闪动；
   - **写作区正文字号** 14–30px：`.prose-editor { font-size: var(--editor-font-size, 0.875rem) }`，写作区 `ChapterEditor` 容器注入该变量（其它富文本场景不受影响）；`.prose-editor` 的 h1/h2/h3 由 rem 改为 em，跟随正文字号缩放；页面内提供正文实时预览 + 恢复默认。
@@ -161,8 +168,8 @@
   - `src/main.tsx`：`window.location.protocol === 'file:'` 时用 `HashRouter`，否则 `BrowserRouter`（Electron 以 file:// 加载，history 路由会 404）。
   - `vite.config.ts`：改为函数式 `defineConfig(({ mode }) => …)`；`vite build --mode electron` 时 `base: './'`（file:// 需相对资源路径）且 `VitePWA({ disable: true })`（file:// 无法注册 SW）；Web 构建仍 `base: '/'` + 正常注入 SW。
   - 新增 `electron/main.cjs`；`package.json` 增 `main`（electron/main.cjs）、`author`、electron-builder `build` 配置（nsis + portable，x64，输出 `release-desktop/`）。
-- 脚本：`npm run build:electron`（`tsc -b && vite build --mode electron`）、`npm run electron:dev`（构建后本机跑桌面窗口）、`npm run dist:exe`（= build:electron + `electron-builder --win`）。
-- 产物：`release-desktop/NovelCreator Setup 0.1.0.exe`（NSIS 安装版：可选目录、桌面/开始菜单快捷方式）、`NovelCreator 0.1.0.exe`（便携版）、`win-unpacked/`（免安装目录），约 113MB。
+- 脚本：`npm run build:electron`（`tsc -b && vite build --mode electron`）、`npm run electron:dev`（构建后本机跑桌面窗口）、`npm run dist:exe`（一键打包，见本轮变更）。
+- 产物：**单文件便携版 exe** `release-desktop/NovelCreator-v<version>.exe`（约 100MB，双击即用；不再产出 NSIS 安装包与 win-unpacked 目录）。
 - **打包坑（已复现并绕过）**：electron-builder 解压 Electron 用 `fs.rename(tmp → win-unpacked)`，Windows 下遇实时杀毒/文件锁会 `EPERM`。绕过：`build.electronDist: "node_modules/electron/dist"`（走纯拷贝）；该目录缺失时从 `%LOCALAPPDATA%\electron\Cache\*\electron-v<版本>-win32-x64.zip` 用 `7za x -o<目标> <zip>` 解压（解压不涉及 rename）。失败残留 `win-unpacked.tmp/` 需手动删除后重打包。
 - **本机环境限制**：该 IDE 会话对 `fs.rm`/`Remove-Item` 注入了 safe-delete 钩子（依赖系统回收站），而本机回收站不可用 → 任何"清空已存在输出目录"的打包操作都会失败。对策：输出到**尚不存在的新目录**（`--config.directories.output=<新目录>`）或手动删除旧目录。`.gitignore` 用通配 `release*` 覆盖各输出目录。
 - 其他：默认 Electron 图标（放 `build/icon.ico` ≥256×256 再打包即可替换）；桌面版数据在 Electron userData（`%APPDATA%\NovelCreator`），**与浏览器版互不相通**（迁移用项目 JSON 导出/导入）；外链走系统浏览器；`dependencies` 中的纯前端库会被 electron-builder 一并放入 asar（可移到 devDependencies 减小体积）。

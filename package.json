@@ -1,7 +1,7 @@
 {
   "name": "novel-creator",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.2",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "小说创作辅助工具：本地优先、方法论驱动、面向中文小说创作者的设定管理与写作工作台",
@@ -12,7 +12,9 @@
     "preview": "vite preview",
     "build:electron": "tsc -b && vite build --mode electron",
     "electron:dev": "npm run build:electron && electron .",
-    "dist:exe": "npm run build:electron && electron-builder --win"
+    "dist:exe": "node scripts/build-desktop.mjs",
+    "dist:exe:minor": "node scripts/build-desktop.mjs --minor",
+    "dist:exe:major": "node scripts/build-desktop.mjs --major"
   },
   "dependencies": {
     "@tiptap/extension-placeholder": "^2.27.3",
@@ -59,12 +61,6 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
           "target": "portable",
           "arch": [
             "x64"
@@ -72,13 +68,8 @@
         }
       ]
     },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "NovelCreator"
+    "portable": {
+      "artifactName": "NovelCreator-v${version}.${ext}"
     }
   }
 }
