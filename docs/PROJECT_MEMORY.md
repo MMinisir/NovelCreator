@@ -150,6 +150,7 @@
 - **写作区高度自适应（lg+）**：编辑器不再用按视口硬算的 `lg:h-[calc(100vh-23rem)]`，改为整条 flex 链撑满内容区——WritingPage 根 `lg:h-full lg:flex lg:min-h-0 lg:flex-col` → 标题栏 `lg:shrink-0` → 主体 `lg:min-h-0 lg:flex-1 lg:items-stretch` → 章节列表卡片与 `main` 都 `lg:flex lg:min-h-0 lg:flex-col`（列表 `ul` 由内联 `maxHeight: calc(100vh-15rem)` 改为 `max-h-[calc(100vh-15rem)] lg:max-h-none lg:min-h-0 lg:flex-1`）→ ChapterEditor 卡片 `lg:flex lg:min-h-0 lg:flex-1 lg:flex-col`（头部/字数行/底部提示 `lg:shrink-0`）→ `RichTextEditor` 新增 `fillHeight`。
 - 效果：桌面端写作区**正好填满内容区高度、不再出现整页上下滚动**，正文过长只在编辑框内部滚动；小屏（<lg）保持原有固定高度与整页滚动行为不变。
 - 分屏参考面板同步：`ReferencePanel` 根加 `lg:min-h-0 lg:overflow-y-auto`，分屏时高度跟随容器、内容过长在面板内滚动（不再撑高页面）。
+- **修复（同轮引入的回归）**：章节列表 `aside` 的 `lg:flex lg:min-h-0 lg:flex-col` 写在了基础类里，与「收起」分支的 `hidden` 冲突——桌面宽度下 `lg:flex` 覆盖 `hidden`，导致工具栏「章节列表」按钮点了没反应（列表不隐藏、正文拿不到宽度）。改为把 flex 类放进「未收起」分支：`listCollapsed ? 'hidden' : 'lg:flex lg:min-h-0 lg:w-72 lg:flex-col'`。**约定：同一元素的显示/隐藏切换，display 工具类（flex/block/grid…）必须与 `hidden` 放在同一个条件分支里，不要用「无条件 `lg:flex` + 条件 `hidden`」。**
 
 ### 上轮（项目工作区：侧栏可折叠为图标 + 左右独立滚动）
 - **侧栏折叠**：`ProjectWorkspace` 桌面端（md+）侧栏宽度 `w-52 ⇄ w-14`（`transition-[width] duration-200`）；收起后菜单项 `justify-center` 仅显示图标、用 `title` 提示名称，「全部项目」简化为箭头图标；切换按钮固定在侧栏顶部（`ChevronsLeft`/`ChevronsRight`）。状态存入 `settingsStore.sidebarCollapsed`（localStorage `novel-creator.workspace-sidebar-collapsed.v1`，`main.tsx` 启动 `load()` 即读取）→ 刷新与重启都保持；设置页「恢复默认」会展开。

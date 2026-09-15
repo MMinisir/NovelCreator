@@ -228,8 +228,9 @@ export default function WritingPage() {
           {/* 章节列表 */}
           <aside
             className={cn(
-              'w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm lg:flex lg:min-h-0 lg:flex-col',
-              listCollapsed ? 'hidden' : 'lg:w-72',
+              'w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm',
+              // 注意：flex 类必须放在「未收起」分支里——否则 lg:flex 会覆盖 hidden，导致桌面端收起按钮失效
+              listCollapsed ? 'hidden' : 'lg:flex lg:min-h-0 lg:w-72 lg:flex-col',
             )}
           >
             <div className="mb-2 flex items-center justify-between px-1">
