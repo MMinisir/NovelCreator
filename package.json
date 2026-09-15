@@ -1,7 +1,7 @@
 {
   "name": "novel-creator",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.4",
   "type": "module",
   "main": "electron/main.cjs",
   "description": "小说创作辅助工具：本地优先、方法论驱动、面向中文小说创作者的设定管理与写作工作台",
