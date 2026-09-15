@@ -62,6 +62,7 @@ export function RichTextEditor({
   onSelectionChange,
   typewriter = false,
   scrollClassName,
+  fillHeight = false,
 }: {
   value?: string
   onChange: (html: string) => void
@@ -75,6 +76,11 @@ export function RichTextEditor({
   typewriter?: boolean
   /** 编辑区独立滚动容器的高度类（如 h-[calc(100vh-23rem)]），配合打字机模式使用，正文过长时内部滚动 */
   scrollClassName?: string
+  /**
+   * 撑满父级高度（lg 及以上生效）：父链需为 `lg:flex lg:min-h-0`，
+   * 编辑器高度随容器自适应、内部滚动——替代按视口硬算的 calc 高度，避免整页出现滚动条。
+   */
+  fillHeight?: boolean
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const editor = useEditor({
@@ -158,11 +164,15 @@ export function RichTextEditor({
       className={cn(
         'overflow-hidden rounded-lg border border-stone-300 bg-white transition-colors focus-within:ring-2 focus-within:ring-violet-500/40 focus-within:border-violet-500',
         typewriter && 'typewriter-caret',
+        fillHeight && 'lg:flex lg:min-h-0 lg:flex-1 lg:flex-col',
       )}
     >
       {editor && <Toolbar editor={editor} />}
-      {scrollClassName ? (
-        <div ref={scrollRef} className={cn('overflow-y-auto', scrollClassName)}>
+      {scrollClassName || fillHeight ? (
+        <div
+          ref={scrollRef}
+          className={cn('overflow-y-auto', fillHeight && 'lg:min-h-0 lg:flex-1', scrollClassName)}
+        >
           <EditorContent editor={editor} />
         </div>
       ) : (

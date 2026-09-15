@@ -157,8 +157,8 @@ export default function WritingPage() {
   }
 
   return (
-    <div>
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div className="lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3 lg:mb-4 lg:shrink-0">
         <div>
           <h1 className="text-xl font-bold text-stone-900">写作区</h1>
           <p className="mt-0.5 text-sm text-stone-500">
@@ -224,11 +224,11 @@ export default function WritingPage() {
           <div className="flex-1 animate-pulse rounded-2xl bg-stone-200/60" />
         </div>
       ) : (
-        <div className="flex flex-col items-stretch gap-5 lg:flex-row lg:items-start">
+        <div className="flex flex-col items-stretch gap-5 lg:min-h-0 lg:flex-1 lg:flex-row lg:items-stretch lg:gap-4">
           {/* 章节列表 */}
           <aside
             className={cn(
-              'w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm',
+              'w-full shrink-0 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm lg:flex lg:min-h-0 lg:flex-col',
               listCollapsed ? 'hidden' : 'lg:w-72',
             )}
           >
@@ -241,7 +241,7 @@ export default function WritingPage() {
             {sorted.length === 0 ? (
               <p className="px-2 py-8 text-center text-sm text-stone-400">还没有章节<br />点击「新建章节」开始写作</p>
             ) : (
-              <ul className="space-y-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 15rem)' }}>
+              <ul className="max-h-[calc(100vh-15rem)] space-y-1 overflow-y-auto lg:max-h-none lg:min-h-0 lg:flex-1">
                 {sorted.map((c, i) => (
                   <li key={c.id}>
                     <button
@@ -266,9 +266,9 @@ export default function WritingPage() {
           </aside>
 
           {/* 编辑器区（US-501b：开启分屏时左侧参考面板 + 右侧正文） */}
-          <main className="min-w-0 flex-1">
+          <main className="min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col">
             {selected ? (
-              <div className={cn('flex items-start gap-4', showReference && 'flex-col lg:flex-row')}>
+              <div className={cn('flex items-stretch gap-4 lg:min-h-0 lg:flex-1', showReference && 'flex-col lg:flex-row')}>
                 {showReference && (
                   <ReferencePanel
                     chapter={selected}
@@ -279,7 +279,7 @@ export default function WritingPage() {
                     foreshadowings={foreshadowings}
                   />
                 )}
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 lg:flex lg:min-h-0 lg:flex-col">
                   <ChapterEditor
                     key={selected.id}
                     chapter={selected}
@@ -514,11 +514,11 @@ function ChapterEditor({
 
   return (
     <div
-      className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+      className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm lg:flex lg:min-h-0 lg:flex-1 lg:flex-col"
       style={{ '--editor-font-size': `${editorFontSize}px` } as CSSProperties}
     >
       {/* 头部：标题 + 状态 + 保存指示 */}
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-wrap items-center gap-3 lg:shrink-0">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -582,7 +582,7 @@ function ChapterEditor({
       </div>
 
       {/* 字数 */}
-      <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-stone-400">
+      <div className="mb-3 flex flex-wrap items-center gap-3 text-xs text-stone-400 lg:shrink-0">
         <span className="flex items-center gap-1">
           <FileText className="size-3.5" /> {wordCount.toLocaleString()} 字
         </span>
@@ -597,31 +597,38 @@ function ChapterEditor({
         )}
       </div>
 
-      {selection && (
-        <div className="mb-2 flex items-center justify-end gap-2">
-          <span className="text-xs text-stone-400">已选中 {selection.text.length} 字</span>
-          <Button size="sm" variant="ghost" onClick={() => setCommentOpen(true)} title="为选中文本添加批注（US-1001）">
-            <MessageSquarePlus className="size-3.5" /> 添加批注
-          </Button>
-          <Button size="sm" variant="secondary" onClick={() => setPolishOpen(true)}>
-            <Sparkles className="size-3.5" /> AI 润色选中
-          </Button>
-        </div>
-      )}
-      <RichTextEditor
-        value={html}
-        onChange={(h) => {
-          setHtml(h)
-          scheduleSave()
-        }}
-        apiRef={editorApiRef.current}
-        onSelectionChange={setSelection}
-        placeholder="此刻开始书写故事……（支持标题、加粗、列表、引用等；选中文字可 AI 润色）"
-        minHeight="min-h-40"
-        scrollClassName="h-[26rem] min-h-72 lg:h-[calc(100vh-23rem)]"
-        typewriter={typewriter}
-      />
-      <p className="mt-2 text-right text-xs text-stone-300">停笔 1.5 秒后自动保存至浏览器本地</p>
+      {/*
+        选中文本操作条：悬浮在编辑区右上角（不占布局高度），
+        避免它出现时把正文挤到需要整页滚动；悬浮层用 backdrop-blur 保证压在文字上仍可读。
+      */}
+      <div className="relative flex min-h-0 flex-col lg:flex-1">
+        {selection && (
+          <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white/95 px-2 py-1 shadow-md backdrop-blur">
+            <span className="hidden text-xs text-stone-400 sm:inline">已选中 {selection.text.length} 字</span>
+            <Button size="sm" variant="ghost" onClick={() => setCommentOpen(true)} title="为选中文本添加批注（US-1001）">
+              <MessageSquarePlus className="size-3.5" /> 添加批注
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setPolishOpen(true)}>
+              <Sparkles className="size-3.5" /> AI 润色选中
+            </Button>
+          </div>
+        )}
+        <RichTextEditor
+          value={html}
+          onChange={(h) => {
+            setHtml(h)
+            scheduleSave()
+          }}
+          apiRef={editorApiRef.current}
+          onSelectionChange={setSelection}
+          placeholder="此刻开始书写故事……（支持标题、加粗、列表、引用等；选中文字可 AI 润色）"
+          minHeight="min-h-40"
+          scrollClassName="h-[26rem] min-h-72"
+          fillHeight
+          typewriter={typewriter}
+        />
+      </div>
+      <p className="mt-2 shrink-0 text-right text-xs text-stone-300">停笔 1.5 秒后自动保存至浏览器本地</p>
 
       {versionOpen && (
         <ChapterVersionModal

@@ -79,8 +79,9 @@ export default function ReferencePanel({
     [node, eventById],
   )
 
+  // lg 分屏时高度跟随容器（不撑高页面），内容过长在面板内滚动
   return (
-    <aside className="w-full shrink-0 space-y-3 lg:w-72">
+    <aside className="w-full shrink-0 space-y-3 lg:min-h-0 lg:w-72 lg:overflow-y-auto">
       <Section icon={<ScrollText className="size-3.5" />} title="本章细纲">
         {node ? (
           <>

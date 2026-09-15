@@ -19,7 +19,7 @@
 | `services/exportImport.ts` | 项目 JSON 导出/导入（全表按 projectId 收集） |
 | `types/` | `base.ts`(id/时间戳通用)、`project.ts`、`character.ts`、`world.ts`(Location/StoryEvent/Relationship)、`outline.ts`、`chapter.ts`、`meta.ts`(Foreshadowing/模板等) |
 | `components/ui.tsx` | **统一 UI 原语**：Button/Input/Textarea/Select/Field/Badge/Modal/ConfirmDialog/EmptyState/Tooltip/TextWithHint… 颜色 Badge='violet'/'amber'/'green'/'slate' 等；风格=圆角卡片 stone 系 |
-| `components/rich/RichTextEditor.tsx` | TipTap 封装（StarterKit），value/onChange=**HTML 字符串**；可选 `typewriter`（打字机模式：输入时光标行平滑滚到滚动容器纵向 42%）+ `scrollClassName`（编辑区独立滚动容器的高度类） |
+| `components/rich/RichTextEditor.tsx` | TipTap 封装（StarterKit），value/onChange=**HTML 字符串**；可选 `typewriter`（打字机模式：输入时光标行平滑滚到滚动容器纵向 42%）+ `scrollClassName`（编辑区独立滚动容器的高度类）+ `fillHeight`（lg 及以上撑满父级 flex 容器、高度自适应并内部滚动；父链需 `lg:flex lg:min-h-0`） |
 | `components/layout/` | 应用壳：侧栏导航/顶栏 |
 | `components/{people,relationship,project,time,outline}/` | 分模块组件（如 outline 下 OutlineSetupCards / OutlineNodeEditor）；time/FlexibleTimeEditor 灵活时间编辑 |
 | `services/ai/` | **AI 服务层（Sprint 5 预研 + Sprint 7 开放）**：`types.ts`(AIProvider 接口/AIProviderConfig)、`openaiCompat.ts`(OpenAI 兼容 Provider + createAIProvider)、`contextBuilder.ts`(项目/人物上下文纯函数)、**`config.ts`**(US-801 配置 localStorage + 服务商预设)、**`tasks.ts`**(US-802~804 生成与解析：generateSynopsisText/parseSynopsis、generateCharacterBioText、generateRelationshipSuggestions/parseRelationshipSuggestions) |
@@ -145,7 +145,13 @@
 
 ## 8. 最近变更
 
-### 本轮（项目工作区：侧栏可折叠为图标 + 左右独立滚动）
+### 本轮（写作区：选中操作条悬浮 + 高度自适应不再整页滚动）
+- **选中操作条改为悬浮**：`ChapterEditor` 中「已选中 N 字 / 添加批注 / AI 润色选中」原来是编辑区上方的一行（出现时会占高度、把正文挤下去），现改为绝对定位浮在编辑区右上角（外包裹 `relative flex min-h-0 flex-col lg:flex-1`，浮层 `absolute right-2 top-2 z-20 rounded-xl border bg-white/95 shadow-md backdrop-blur`），不占布局高度；小屏自动隐藏「已选中 N 字」文字、只留按钮。
+- **写作区高度自适应（lg+）**：编辑器不再用按视口硬算的 `lg:h-[calc(100vh-23rem)]`，改为整条 flex 链撑满内容区——WritingPage 根 `lg:h-full lg:flex lg:min-h-0 lg:flex-col` → 标题栏 `lg:shrink-0` → 主体 `lg:min-h-0 lg:flex-1 lg:items-stretch` → 章节列表卡片与 `main` 都 `lg:flex lg:min-h-0 lg:flex-col`（列表 `ul` 由内联 `maxHeight: calc(100vh-15rem)` 改为 `max-h-[calc(100vh-15rem)] lg:max-h-none lg:min-h-0 lg:flex-1`）→ ChapterEditor 卡片 `lg:flex lg:min-h-0 lg:flex-1 lg:flex-col`（头部/字数行/底部提示 `lg:shrink-0`）→ `RichTextEditor` 新增 `fillHeight`。
+- 效果：桌面端写作区**正好填满内容区高度、不再出现整页上下滚动**，正文过长只在编辑框内部滚动；小屏（<lg）保持原有固定高度与整页滚动行为不变。
+- 分屏参考面板同步：`ReferencePanel` 根加 `lg:min-h-0 lg:overflow-y-auto`，分屏时高度跟随容器、内容过长在面板内滚动（不再撑高页面）。
+
+### 上轮（项目工作区：侧栏可折叠为图标 + 左右独立滚动）
 - **侧栏折叠**：`ProjectWorkspace` 桌面端（md+）侧栏宽度 `w-52 ⇄ w-14`（`transition-[width] duration-200`）；收起后菜单项 `justify-center` 仅显示图标、用 `title` 提示名称，「全部项目」简化为箭头图标；切换按钮固定在侧栏顶部（`ChevronsLeft`/`ChevronsRight`）。状态存入 `settingsStore.sidebarCollapsed`（localStorage `novel-creator.workspace-sidebar-collapsed.v1`，`main.tsx` 启动 `load()` 即读取）→ 刷新与重启都保持；设置页「恢复默认」会展开。
 - **左右独立滚动**：工作区外层在 md+ 固定视口剩余高度 `md:h-[calc(100vh-3.5rem)] md:overflow-hidden`，`aside` 与 `section` 各自 `overflow-y-auto` —— 右侧内容再长（人物详情 / 写作区 / 大纲 / 时间线等）也只滚动内容区，左侧菜单始终停在原位，可随时切换页签；`aside` 自身也可滚动（菜单项超出高度时）。
 - 小屏（<md）**不使用固定高度**：侧栏本就隐藏（横向 tab），保持整页滚动，避免移动端 `100vh` 地址栏抖动问题。
