@@ -52,7 +52,7 @@
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
 | `scripts/build-desktop.mjs` | **桌面版一键打包**（`npm run dist:exe`）：自动升版本号（patch/minor/major/指定）→ electron 模式建前端 → electron-builder 出**单文件便携版**（输出到系统临时目录）→ 复制为 `release-desktop/NovelCreator-v<version>.exe` → 清理旧版本与历史 `release*` 目录。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
-| `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
+| `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage；界面字号、写作区字号、工作区侧栏是否收起 sidebarCollapsed）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
 | `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
 | `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
 | `components/timeline/EventQuickEditModal.tsx` | **事件快速编辑**（时间线列表行铅笔按钮 / 甘特图详情条「编辑事件」调起）：只含常用字段（名称、1-5 星重要性、**情节张力 1-5（`Flame` 图标，再点同一档取消=未评估）**、发生时间 `FlexibleTimeEditor`、类型 chips、地点、参与者 `CharacterMultiSelect`），保存 `eventRepo.update` 后由页面局部 `setItems` 回写；footer 左侧提供「去事件页完整编辑 →」链接（描述/结果/伏笔在事件页维护） |
@@ -63,7 +63,7 @@
 | `components/ai/PolishModal.tsx` | **AI 润色弹窗（US-806）**：原文只读 + 润色方向 + 结果可编辑 + 行 diff 对比 +「替换选中」（onApply 返回 false=选区失效提示） |
 | `components/rich/RichTextEditor.tsx` | 新增选区 API：`EditorSelection`、`RichTextEditorAPI`（getSelection/replaceSelectionWithText）、`RichTextEditorAPIRef`（普通对象避开 React19 RefObject 只读 current）；`onSelectionUpdate` 上报选区、`onSelectionChange` 回调 |
 | `pages/ProjectListPage.tsx` | 首页项目列表 |
-| `pages/project/ProjectWorkspace.tsx` | 项目内布局 + 侧栏模块导航（设置 URL: `/projects/:id/xxx`） |
+| `pages/project/ProjectWorkspace.tsx` | 项目内布局 + 侧栏模块导航（设置 URL: `/projects/:id/xxx`）；桌面端（md+）左侧菜单**可收起为纯图标**（`w-52 ⇄ w-14`，状态存 settingsStore/localStorage）且**与右侧内容区各自独立滚动**（外层 `md:h-[calc(100vh-3.5rem)] md:overflow-hidden`，aside 与 section 各自 `overflow-y-auto`）；小屏保持横向 tab + 整页滚动 |
 | `pages/project/*Page.tsx` | Characters/Locations/Events/Outline/Writing/CharacterDetail/Overview/Settings/Timeline/Graph/**Foreshadowings**/Ideas/ModulePlaceholder（兜底） |
 | `hooks/useProjectEntityList.ts` | `useProjectEntityList(repo, projectId)` → `{items, loaded, refresh}`（按项目订阅实体列表） |
 | `stores/projectStore.ts` | 当前项目缓存（Zustand） |
@@ -145,7 +145,13 @@
 
 ## 8. 最近变更
 
-### 本轮（一键打包：单文件 exe + 自动版本号 + 清理旧版本）
+### 本轮（项目工作区：侧栏可折叠为图标 + 左右独立滚动）
+- **侧栏折叠**：`ProjectWorkspace` 桌面端（md+）侧栏宽度 `w-52 ⇄ w-14`（`transition-[width] duration-200`）；收起后菜单项 `justify-center` 仅显示图标、用 `title` 提示名称，「全部项目」简化为箭头图标；切换按钮固定在侧栏顶部（`ChevronsLeft`/`ChevronsRight`）。状态存入 `settingsStore.sidebarCollapsed`（localStorage `novel-creator.workspace-sidebar-collapsed.v1`，`main.tsx` 启动 `load()` 即读取）→ 刷新与重启都保持；设置页「恢复默认」会展开。
+- **左右独立滚动**：工作区外层在 md+ 固定视口剩余高度 `md:h-[calc(100vh-3.5rem)] md:overflow-hidden`，`aside` 与 `section` 各自 `overflow-y-auto` —— 右侧内容再长（人物详情 / 写作区 / 大纲 / 时间线等）也只滚动内容区，左侧菜单始终停在原位，可随时切换页签；`aside` 自身也可滚动（菜单项超出高度时）。
+- 小屏（<md）**不使用固定高度**：侧栏本就隐藏（横向 tab），保持整页滚动，避免移动端 `100vh` 地址栏抖动问题。
+- 兼容性核查：全项目 `sticky` 只有 `AppLayout` 顶栏与 `TimelineGantt`（后者在自己的 `overflow-auto` 容器内）、页面内 `xl:sticky xl:top-6`（大纲右列）与写作区 `h-[calc(100vh-23rem)]` 编辑区在新滚动容器下仍按预期工作（内容区滚动兜底）。
+
+### 上轮（一键打包：单文件 exe + 自动版本号 + 清理旧版本）
 - 新增 `scripts/build-desktop.mjs`（`npm run dist:exe`）五步流程：① 自动升级版本号（默认 patch，支持 `--minor` / `--major` / `--version=x.y.z`，写回 package.json）② electron 模式构建前端 ③ `electron-builder --win portable` 生成**单文件便携版 exe**（输出到系统临时目录，天然规避"清空已存在输出目录"类失败）④ 复制为 `release-desktop/NovelCreator-v<version>.exe` ⑤ 清理其它 `release*` 历史目录、旧版本 exe 与中间产物（删除失败只告警不中断，兼容被安全策略接管删除的环境）。
 - 脚本内的子进程一律用 `node <node_modules/<pkg>/<bin>>` 方式执行（`binEntry()` 从各包 package.json 的 `bin` 字段解析）：Windows + Node ≥20 禁止 `spawnSync('npm.cmd')`（`EINVAL`），同时避免 `NovelCreator-v${version}.${ext}` 这类含宏参数被 shell 转义。
 - `package.json`：`win.target` 只保留 `portable`（不再产出 NSIS 安装包 / win-unpacked），`portable.artifactName = NovelCreator-v${version}.${ext}`，新增 `dist:exe:minor` / `dist:exe:major`。

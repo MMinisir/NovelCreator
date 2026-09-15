@@ -5,6 +5,8 @@ import {
   ArrowLeft,
   BookOpen,
   CalendarClock,
+  ChevronsLeft,
+  ChevronsRight,
   Clock,
   Flag,
   HeartPulse,
@@ -19,6 +21,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { useAutoBackup } from '@/hooks/useAutoBackup'
 import { EmptyState } from '@/components/ui'
 
@@ -39,12 +42,24 @@ const MODULES = [
   { path: 'settings', label: '项目设置', icon: Settings },
 ]
 
+/** 侧栏菜单项样式；收起为纯图标时居中，靠 title 提示名称 */
+function navItemClass(active: boolean, collapsed: boolean): string {
+  return `mb-0.5 flex items-center gap-2.5 rounded-lg py-2 text-sm transition-colors ${
+    collapsed ? 'justify-center px-0' : 'px-3'
+  } ${
+    active ? 'bg-violet-100 font-medium text-violet-800' : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+  }`
+}
+
 /** 项目工作台：二级导航 + 内容区（设计文档 §6.1） */
 export default function ProjectWorkspace() {
   const { projectId } = useParams<{ projectId: string }>()
   const loadProjects = useProjectStore((s) => s.loadProjects)
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject)
   const project = useProjectStore((s) => s.getProject(projectId ?? ''))
+  // 桌面端侧栏可收起为纯图标（本机偏好，持久化于全局设置）
+  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed)
+  const toggleSidebarCollapsed = useSettingsStore((s) => s.toggleSidebarCollapsed)
 
   useEffect(() => {
     if (projectId) setCurrentProject(projectId)
@@ -76,36 +91,55 @@ export default function ProjectWorkspace() {
   }
 
   return (
-    <div className="mx-auto flex max-w-[1800px] flex-col gap-6 px-4 py-4 lg:flex-row lg:gap-8 lg:px-6">
-      <aside className="hidden w-52 shrink-0 md:block">
-        <Link
-          to="/projects"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-stone-500 hover:text-violet-700"
-        >
-          <ArrowLeft className="size-4" /> 全部项目
-        </Link>
-        <nav className="space-y-0.5">
+    <div className="mx-auto flex max-w-[1800px] flex-col gap-6 px-4 py-4 md:h-[calc(100vh-3.5rem)] md:flex-row md:gap-6 md:overflow-hidden lg:px-6">
+      {/*
+        左侧菜单（桌面端）：固定视口高度 + 自身独立滚动，
+        与右侧内容区互不影响——右侧内容再长也能随时快速切换页签。
+        收起后仅显示图标（宽度 3.5rem），状态记在本机偏好里。
+      */}
+      <aside
+        className={`hidden shrink-0 flex-col md:flex ${
+          sidebarCollapsed ? 'w-14' : 'w-52'
+        } transition-[width] duration-200`}
+      >
+        <div className={`flex h-8 shrink-0 items-center pb-1 ${sidebarCollapsed ? 'justify-center' : 'justify-end'}`}>
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            title={sidebarCollapsed ? '展开菜单' : '收起为图标'}
+            aria-label={sidebarCollapsed ? '展开菜单' : '收起为图标'}
+            className="inline-flex size-7 cursor-pointer items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
+          >
+            {sidebarCollapsed ? <ChevronsRight className="size-4" /> : <ChevronsLeft className="size-4" />}
+          </button>
+        </div>
+        <nav className="min-h-0 flex-1 overflow-y-auto pr-1">
+          <Link
+            to="/projects"
+            title={sidebarCollapsed ? '全部项目' : undefined}
+            className={navItemClass(false, sidebarCollapsed)}
+          >
+            <ArrowLeft className="size-4 shrink-0" />
+            {!sidebarCollapsed && '全部项目'}
+          </Link>
+          <div className="my-1.5 border-t border-stone-200" />
           {MODULES.map((m) => (
             <NavLink
               key={m.path || 'overview'}
               to={m.path}
               end={m.end}
-              className={({ isActive }) =>
-                `flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-colors ${
-                  isActive
-                    ? 'bg-violet-100 font-medium text-violet-800'
-                    : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
-                }`
-              }
+              title={sidebarCollapsed ? m.label : undefined}
+              className={({ isActive }) => navItemClass(isActive, sidebarCollapsed)}
             >
               <m.icon className="size-4 shrink-0" />
-              {m.label}
+              {!sidebarCollapsed && m.label}
             </NavLink>
           ))}
         </nav>
       </aside>
 
-      <section className="min-w-0 flex-1">
+      {/* 右侧内容区：桌面端独立滚动（小屏仍为整页滚动，避免移动端视口高度抖动） */}
+      <section className="min-w-0 flex-1 md:overflow-y-auto md:pr-1">
         {/* 移动端模块导航（Sprint 9 US-902：小屏隐藏左侧栏，改用横向 tab） */}
         <nav className="-mx-4 mb-4 flex gap-1 overflow-x-auto px-4 pb-1 md:hidden">
           {MODULES.map((m) => (
