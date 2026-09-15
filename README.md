@@ -101,8 +101,8 @@ AI 使用透明可控：
 **环境要求**：Node.js 20 或更高（建议 20 / 22 LTS）、npm。
 
 ```bash
-git clone https://github.com/MMinisir/NovalCreator.git
-cd NovalCreator
+git clone https://github.com/MMinisir/NovelCreator.git
+cd NovelCreator
 npm install
 npm run dev        # 浏览器开发服务器（默认 http://localhost:5173）
 ```
