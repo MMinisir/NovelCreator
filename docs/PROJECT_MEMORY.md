@@ -51,6 +51,8 @@
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
+| `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
+| `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
 | `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
 | `components/timeline/EventQuickEditModal.tsx` | **事件快速编辑**（时间线列表行铅笔按钮 / 甘特图详情条「编辑事件」调起）：只含常用字段（名称、1-5 星重要性、**情节张力 1-5（`Flame` 图标，再点同一档取消=未评估）**、发生时间 `FlexibleTimeEditor`、类型 chips、地点、参与者 `CharacterMultiSelect`），保存 `eventRepo.update` 后由页面局部 `setItems` 回写；footer 左侧提供「去事件页完整编辑 →」链接（描述/结果/伏笔在事件页维护） |
 | `components/timeline/TimelineGantt.tsx` | **时间线甘特视图**：X 轴=筛选后事件序列（列头 序号+时间标签，最多 150 列），Y 轴=人物/地点泳道，色点=参与/发生（事件类型实心色），横条=活跃区间，点击列头或色点看详情条；左侧与表头 sticky、双向滚动、类型图例；**情节张力带**（柱高=tension 1-5 + 玫瑰色折线连各柱顶，未评估显示灰点）与张力统计摘要 |
@@ -142,7 +144,13 @@
 
 ## 8. 最近变更
 
-### 本轮（全站宽容器：所有页面铺满）
+### 本轮（字号设置 + AI 配置迁到全局设置）
+- 新增全局设置 store `stores/settingsStore.ts`（localStorage：`novel-creator.ui-font-size.v1` / `novel-creator.editor-font-size.v1`）与全局设置页 `pages/AppSettingsPage.tsx`（路由 `/settings`，顶栏新增「设置」入口）：
+  - **界面字号** 14–20px：改 `<html>` 根字号（Tailwind 基于 rem → 整站文字与间距按比例缩放），main.tsx 在首帧前 `load()` 应用避免闪动；
+  - **写作区正文字号** 14–30px：`.prose-editor { font-size: var(--editor-font-size, 0.875rem) }`，写作区 `ChapterEditor` 容器注入该变量（其它富文本场景不受影响）；`.prose-editor` 的 h1/h2/h3 由 rem 改为 em，跟随正文字号缩放；页面内提供正文实时预览 + 恢复默认。
+- **AI 服务配置**从「项目设置」迁至全局设置（其存储本就是 localStorage 全局、不随项目导出）：`ProjectSettingsPage` 移除 `AIConfigPanel`，改为提示卡 + 「去全局设置配置 AI →」链接（`BackupPanel` 仍留在项目设置）；同步更新 3 处提示文案（`tasks.ts` 的 requireConfig 报错、`AIConfigMissingHint`、大纲弹窗的 tokens 提示）为「顶栏『设置 → AI 服务配置』」。
+
+### 上轮（全站宽容器：所有页面铺满）
 - `ProjectWorkspace` 容器统一为 `max-w-[1800px]`（原「仅 /writing 放宽、其它 max-w-7xl」的特例逻辑删除，随之移除 `useLocation`/`isWriting`/`cn` 依赖）→ 项目内**所有页面**（概览/人物/地点/事件/大纲/时间线/关系图/伏笔/灵感/一致性/体检/AI 请求/设置）与写作区一致铺满。
 - `ProjectListPage`（`max-w-7xl` → `max-w-[1800px]`）与 `PromptTemplatesPage`（`max-w-5xl` → `max-w-[1800px]`）同步放宽。
 - `ProjectSettingsPage` 去掉 `mx-auto max-w-3xl`，并在宽屏加分列：基本信息 `lg:grid-cols-3`、创作模式 `lg:grid-cols-4`、时间与章节预设 `lg:grid-cols-4`（避免超宽屏下输入框被拉得过长）。

@@ -178,6 +178,6 @@ export default function AIConfigPanel() {
 /** 未配置 AI 时的提示徽标（各生成入口复用） */
 export function AIConfigMissingHint() {
   return (
-    <Badge color="amber">请先在「项目设置 → AI 服务配置」填写 API Key</Badge>
+    <Badge color="amber">请先在顶栏「设置 → AI 服务配置」填写 API Key</Badge>
   )
 }

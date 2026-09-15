@@ -56,7 +56,7 @@ export { AI_KIND_LABELS, SYSTEM_PROMPT }
 
 function requireConfig(config: AIProviderConfig | null): AIProviderConfig {
   if (!config || !config.apiKey?.trim()) {
-    throw new Error('尚未配置 AI 服务：请在「项目设置 → AI 服务配置」填写 API Key 并测试连接')
+    throw new Error('尚未配置 AI 服务：请在顶栏「设置 → AI 服务配置」填写 API Key 并测试连接')
   }
   return config
 }

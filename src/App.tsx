@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import AppLayout from '@/components/layout/AppLayout'
 import ProjectListPage from '@/pages/ProjectListPage'
 import PromptTemplatesPage from '@/pages/PromptTemplatesPage'
+import AppSettingsPage from '@/pages/AppSettingsPage'
 import ProjectWorkspace from '@/pages/project/ProjectWorkspace'
 import ProjectOverviewPage from '@/pages/project/ProjectOverviewPage'
 import ProjectSettingsPage from '@/pages/project/ProjectSettingsPage'
@@ -28,6 +29,7 @@ export default function App() {
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="projects" element={<ProjectListPage />} />
         <Route path="prompts" element={<PromptTemplatesPage />} />
+        <Route path="settings" element={<AppSettingsPage />} />
         <Route path="projects/:projectId" element={<ProjectWorkspace />}>
           <Route index element={<ProjectOverviewPage />} />
           <Route path="characters" element={<CharactersPage />} />

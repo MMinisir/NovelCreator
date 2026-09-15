@@ -1,12 +1,11 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { CheckCircle2, GitMerge, Save } from 'lucide-react'
 import { Badge, Button, Field, Input, Select, Textarea } from '@/components/ui'
 import { useProjectStore } from '@/stores/projectStore'
 import { PROJECT_STATUS_LABELS, PROJECT_TEMPLATE_LABELS } from '@/types/project'
 import type { Project, ProjectMode, ProjectStatus } from '@/types/project'
 import { PROJECT_GENRES } from '@/components/project/ProjectFormModal'
-import AIConfigPanel from '@/components/ai/AIConfigPanel'
 import BackupPanel from '@/components/backup/BackupPanel'
 import MergeWizardModal from '@/components/settings/MergeWizardModal'
 import { buildMergePlan, type MergePlan } from '@/services/merge'
@@ -259,8 +258,16 @@ export default function ProjectSettingsPage() {
         </div>
       </section>
 
-      {/* AI 服务配置（US-801）与自动备份（US-702/703）：面板内按钮均为 type=button，不会提交项目表单 */}
-      <AIConfigPanel />
+      {/* AI 服务配置已移至全局设置（所有项目共用一份）；自动备份（US-702/703）仍按项目操作 */}
+      <section className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-stone-400">AI 服务配置</h2>
+        <p className="text-sm text-stone-500">
+          AI 配置属于全局设置（所有项目共用一份，不随项目导出），已移至顶栏「设置 → AI 服务配置」。
+        </p>
+        <Link to="/settings" className="mt-2 inline-flex text-sm font-medium text-violet-600 hover:text-violet-800">
+          去全局设置配置 AI →
+        </Link>
+      </section>
       <BackupPanel projectId={projectId ?? ''} />
 
       {/* 协作与合并（US-1002）：交换项目 JSON 后逐项合并差异 */}

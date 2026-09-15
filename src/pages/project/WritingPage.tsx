@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
   CheckCircle2,
@@ -24,6 +24,7 @@ import { filterChapterComments } from '@/services/comments'
 import { chaptersToPrintHtml, exportChaptersDocx, printHtml } from '@/services/exportDoc'
 import { useProjectEntityList } from '@/hooks/useProjectEntityList'
 import { useProjectStore } from '@/stores/projectStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { createEntity, downloadTextFile } from '@/utils/common'
 import { chaptersToMarkdown } from '@/utils/markdown'
 import ChapterVersionModal from '@/components/writing/ChapterVersionModal'
@@ -448,6 +449,7 @@ function ChapterEditor({
   const [polishOpen, setPolishOpen] = useState(false)
   const [commentOpen, setCommentOpen] = useState(false) // US-1001 批注面板
   const [chapterAIOpen, setChapterAIOpen] = useState(false) // AI 生成章节正文
+  const editorFontSize = useSettingsStore((s) => s.editorFontSize) // 「设置 → 写作区字号」
   const editorApiRef = useRef<RichTextEditorAPIRef>({ current: null })
   const wordCount = useMemo(() => countWords(html), [html])
   // US-1001：本章未解决批注数（用于按钮角标）
@@ -511,7 +513,10 @@ function ChapterEditor({
   const progress = target ? Math.min(100, Math.round((wordCount / target) * 100)) : undefined
 
   return (
-    <div className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+    <div
+      className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm"
+      style={{ '--editor-font-size': `${editorFontSize}px` } as CSSProperties}
+    >
       {/* 头部：标题 + 状态 + 保存指示 */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input

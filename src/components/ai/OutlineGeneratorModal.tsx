@@ -295,8 +295,8 @@ export default function OutlineGeneratorModal({
             .join('、') || '（暂无）'}
           。
           {plannedChapters > 24
-            ? '章节较多，请先在「项目设置 → AI 服务配置」把最大输出 tokens 调到 4096 以上，否则返回内容可能被截断。'
-            : '若返回内容被截断，可在「项目设置 → AI 服务配置」调大最大输出 tokens。'}
+            ? '章节较多，请先在顶栏「设置 → AI 服务配置」把最大输出 tokens 调到 4096 以上，否则返回内容可能被截断。'
+            : '若返回内容被截断，可在顶栏「设置 → AI 服务配置」调大最大输出 tokens。'}
         </p>
 
         {error && <p className="rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}

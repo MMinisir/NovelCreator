@@ -1,7 +1,11 @@
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, HashRouter } from 'react-router-dom'
 import App from './App'
+import { useSettingsStore } from './stores/settingsStore'
 import './index.css'
+
+// 启动即应用本机字号偏好（在首帧前设置根字号，避免闪动）
+useSettingsStore.getState().load()
 
 // Electron 桌面版以 file:// 加载页面，history 路由会 404，故桌面版改用 hash 路由；
 // Web 版（http/https）保持 BrowserRouter，URL 形式不变。

@@ -32,6 +32,8 @@ body {
 
 /* TipTap 编辑器内容样式 */
 .prose-editor {
+  /* 正文字号：由写作区容器注入 --editor-font-size（「设置 → 写作区字号」）；未注入时等同原 text-sm */
+  font-size: var(--editor-font-size, 0.875rem);
   /* 移动端查看/编辑：长文本（URL 等）自动换行，避免横向溢出（Sprint 9 US-903） */
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -43,16 +45,17 @@ body {
   height: 0;
   pointer-events: none;
 }
+/* 标题用相对单位，跟随正文字号一起缩放 */
 .prose-editor h1 {
-  font-size: 1.35rem;
+  font-size: 1.5em;
   font-weight: 700;
 }
 .prose-editor h2 {
-  font-size: 1.15rem;
+  font-size: 1.25em;
   font-weight: 600;
 }
 .prose-editor h3 {
-  font-size: 1.05rem;
+  font-size: 1.1em;
   font-weight: 600;
 }
 .prose-editor p {

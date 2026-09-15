@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
-import { BookOpenText, Search, TextCursorInput } from 'lucide-react'
+import { BookOpenText, Search, Settings, TextCursorInput } from 'lucide-react'
 import { useProjectStore } from '@/stores/projectStore'
 import { usePromptStore } from '@/services/ai/templates'
 import GlobalSearchModal from '@/components/search/GlobalSearchModal'
@@ -56,6 +56,13 @@ export default function AppLayout() {
             >
               <TextCursorInput className="size-4" />
               <span className="hidden md:inline">提示词管理</span>
+            </Link>
+            <Link
+              to="/settings"
+              className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm text-stone-600 transition-colors hover:border-violet-300 hover:text-violet-700"
+            >
+              <Settings className="size-4" />
+              <span className="hidden md:inline">设置</span>
             </Link>
             {/* 全局搜索（跨实体）：桌面端搜索框，小屏折叠为图标按钮 */}
             <button
