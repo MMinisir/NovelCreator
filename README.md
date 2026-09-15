@@ -107,7 +107,13 @@ npm install
 npm run dev        # 浏览器开发服务器（默认 http://localhost:5173）
 ```
 
-桌面版开发（构建后启动 Electron 窗口）：
+桌面版开发（Electron 窗口 + 前端热更新，推荐）：
+
+```bash
+npm run dev:exe
+```
+
+桌面版以生产构建运行（用于验证打包后的表现）：
 
 ```bash
 npm run electron:dev
@@ -121,7 +127,8 @@ npm run electron:dev
 | `npm run build` | Web 生产构建 → `dist/`（含 PWA Service Worker） |
 | `npm run preview` | 本地预览生产构建 |
 | `npm run build:electron` | 桌面模式构建（相对资源路径、关闭 SW） |
-| `npm run electron:dev` | 构建并启动桌面窗口 |
+| `npm run dev:exe` | **桌面开发模式**：Vite dev server + Electron 窗口（前端热更新，Ctrl+C 退出） |
+| `npm run electron:dev` | 构建后启动桌面窗口（验证生产构建表现） |
 | `npm run dist:exe` | 一键打包 Windows 单文件便携版 exe |
 
 ---

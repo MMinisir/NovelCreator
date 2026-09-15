@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "build:electron": "tsc -b && vite build --mode electron",
     "electron:dev": "npm run build:electron && electron .",
+    "dev:exe": "node scripts/dev-desktop.mjs",
     "dist:exe": "node scripts/build-desktop.mjs",
     "dist:exe:minor": "node scripts/build-desktop.mjs --minor",
     "dist:exe:major": "node scripts/build-desktop.mjs --major"
