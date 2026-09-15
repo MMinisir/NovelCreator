@@ -107,13 +107,21 @@ npm install
 npm run dev        # 浏览器开发服务器（默认 http://localhost:5173）
 ```
 
-桌面版开发（Electron 窗口 + 前端热更新，推荐）：
+桌面版开发（推荐，与桌面版**共用同一份数据**，保存代码自动重建并刷新窗口）：
 
 ```bash
 npm run dev:exe
 ```
 
-桌面版以生产构建运行（用于验证打包后的表现）：
+> 该模式以 `file://` 加载 `dist/`（与打包版同协议、同数据目录），因此打开后就是你平时用的**真实项目数据**，而不是空库。
+
+如需秒级 HMR（该模式数据与桌面版隔离，适合纯 UI 调试）：
+
+```bash
+npm run dev:exe -- --hmr
+```
+
+桌面版以生产构建运行（验证打包后的表现）：
 
 ```bash
 npm run electron:dev
@@ -127,7 +135,7 @@ npm run electron:dev
 | `npm run build` | Web 生产构建 → `dist/`（含 PWA Service Worker） |
 | `npm run preview` | 本地预览生产构建 |
 | `npm run build:electron` | 桌面模式构建（相对资源路径、关闭 SW） |
-| `npm run dev:exe` | **桌面开发模式**：Vite dev server + Electron 窗口（前端热更新，Ctrl+C 退出） |
+| `npm run dev:exe` | **桌面开发模式**（推荐）：与桌面版共用 `file://` 数据，保存代码自动重建并刷新窗口；加 `-- --hmr` 则改用 dev server（真 HMR，数据独立） |
 | `npm run electron:dev` | 构建后启动桌面窗口（验证生产构建表现） |
 | `npm run dist:exe` | 一键打包 Windows 单文件便携版 exe |
 

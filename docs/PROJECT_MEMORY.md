@@ -51,7 +51,7 @@
 | `pages/PromptTemplatesPage.tsx` | 提示词管理页（**全局路由 `/prompts`**，顶栏「提示词管理」入口）：系统提示 + 10 任务模板卡片（`{{变量}}` 说明、保存覆盖/恢复默认、「已自定义/未保存修改」徽标）；自定义模板新建（名称+作用任务+内容）、编辑、删除；模板操作即时写入 IndexedDB 并同步 store，对所有项目生成/预览立即生效 |
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
-| `scripts/dev-desktop.mjs` | **桌面开发模式**（`npm run dev:exe`）：起 Vite dev server（5173 + `--strictPort`）→ 探测就绪 → 以 `VITE_DEV_SERVER_URL` 启动 Electron（主进程据此 loadURL 并自动开 DevTools），前端改动 HMR 即时生效；窗口关闭 / Ctrl+C 时按进程树清理（Windows 用 `taskkill /T /F`）并停掉 dev server |
+| `scripts/dev-desktop.mjs` | **桌面开发模式**（`npm run dev:exe`）：**默认** `tsc -b` + `vite build --watch --mode electron` 持续重建 dist → Electron 以 **file://** 加载（与打包版**共用同一份 IndexedDB 数据**，能看到真实项目），产物变化自动刷新窗口（主进程 `NC_RELOAD_ON_BUILD`）；`npm run dev:exe -- --hmr` 改为 Vite dev server + `VITE_DEV_SERVER_URL`（真 HMR，但数据与桌面版隔离）；退出时按进程树清理（Windows `taskkill /T /F`）|
 | `scripts/build-desktop.mjs` | **桌面版一键打包**（`npm run dist:exe`）：自动升版本号（patch/minor/major/指定）→ electron 模式建前端 → electron-builder 出**单文件便携版**（输出到系统临时目录）→ 复制为 `release-desktop/NovelCreator-v<version>.exe` → 清理旧版本与历史 `release*` 目录。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
 | `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage；界面字号、写作区字号、工作区侧栏是否收起 sidebarCollapsed）：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
 | `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
@@ -146,10 +146,12 @@
 
 ## 8. 最近变更
 
-### 本轮（新增桌面开发模式 dev:exe）
-- 新增 `npm run dev:exe`（`scripts/dev-desktop.mjs`）：一条命令启动 **Vite dev server + Electron 桌面窗口**，前端改动由 HMR 即时生效（无需重新构建）。流程：解析本地 bin 入口启动 vite（`--port 5173 --strictPort`）→ 轮询探测 dev server 就绪 → 以环境变量 `VITE_DEV_SERVER_URL` 启动 Electron（`electron/main.cjs` 早已支持：`loadURL` dev server 并自动打开 DevTools）→ 窗口关闭或 Ctrl+C 时按**进程树**清理（Windows `taskkill /pid /T /F`，否则 Electron 子进程会残留）。
-- 命令分工：`npm run dev`（仅浏览器开发）、**`npm run dev:exe`（桌面窗口 + 热更新，推荐开发用）**、`npm run electron:dev`（先 `build:electron` 再开窗口，用于验证生产构建 / file:// 协议表现）、`npm run dist:exe`（打单文件 exe 用于发布）。
-- 实测：`npm run dev:exe` 正常拉起 Electron（4 进程）与 dev server；README「本地运行」与脚本表已同步。
+### 本轮（桌面开发模式 dev:exe：与打包版共用数据 + 保存即重建刷新）
+- 新增 `npm run dev:exe`（`scripts/dev-desktop.mjs`）。**默认模式**：先 `tsc -b`（类型检查），再 `vite build --watch --mode electron` 持续重建 `dist/`；产物就绪后启动 Electron —— 主进程以 **file://** 加载 dist，并在 `NC_RELOAD_ON_BUILD=1` 时 `fs.watch(dist)`、产物变化后 `reloadIgnoringCache()` 自动刷新窗口（保存代码约 1~2 秒生效）。
+- **为什么默认不用 dev server**：dev server 的 origin 是 `http://localhost:5173`，其 IndexedDB 与打包版（`file://`）**互不相通**（实测 `%APPDATA%\novel-creator\IndexedDB` 下只有 `file__0.indexeddb.leveldb`）——用 dev server 开发会打开一个**空库**、看不到真实项目数据。走 file:// 才能与桌面版共用同一份数据。
+- 真 HMR 仍保留：`npm run dev:exe -- --hmr`（Vite dev server 5173 + 自动开 DevTools，数据独立，适合纯 UI 调试）。
+- 命令分工：`npm run dev`（仅浏览器）、**`npm run dev:exe`（桌面 + 真实数据 + 自动重建刷新，推荐）**、`npm run dev:exe -- --hmr`（桌面 + 真 HMR + 独立数据）、`npm run electron:dev`（一次性生产构建后开窗口）、`npm run dist:exe`（打单文件 exe 发布）。
+- 实测：默认模式拉起 Electron 4 进程、未产生新的 origin 存储（确认读的是 file:// 真实数据）；README 与本文档已同步。
 
 ### 上轮（写作区：选中操作条悬浮 + 高度自适应不再整页滚动）
 - **选中操作条改为悬浮**：`ChapterEditor` 中「已选中 N 字 / 添加批注 / AI 润色选中」原来是编辑区上方的一行（出现时会占高度、把正文挤下去），现改为绝对定位浮在编辑区右上角（外包裹 `relative flex min-h-0 flex-col lg:flex-1`，浮层 `absolute right-2 top-2 z-20 rounded-xl border bg-white/95 shadow-md backdrop-blur`），不占布局高度；小屏自动隐藏「已选中 N 字」文字、只留按钮。

@@ -1,14 +1,19 @@
 /**
  * Electron 主进程（桌面版）：
  * - 生产：`loadFile(dist/index.html)`（file:// 协议，前端已按此切换到 HashRouter）
- * - 开发：设置环境变量 VITE_DEV_SERVER_URL 后加载 vite dev server
+ * - 开发（npm run dev:exe，默认）：Vite `build --watch` 持续重建 dist + 本进程监听产物变化自动刷新
+ *   —— 与打包版同为 file:// 协议，因此共用同一份 IndexedDB 数据，能直接看到真实项目
+ * - 开发（npm run dev:exe -- --hmr）：设置环境变量 VITE_DEV_SERVER_URL 后加载 vite dev server（真 HMR，数据独立）
  * - 前端不启用 nodeIntegration（保持沙箱），因此主进程无需额外 IPC
  * - 外链一律交给系统浏览器打开；单实例锁避免多窗口并发写 IndexedDB
  */
 const { app, BrowserWindow, shell } = require('electron')
+const fs = require('node:fs')
 const path = require('node:path')
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL
+/** 桌面开发模式：dist 产物变化时自动刷新窗口 */
+const RELOAD_ON_BUILD = process.env.NC_RELOAD_ON_BUILD === '1'
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -46,6 +51,25 @@ function createWindow() {
     win.webContents.openDevTools({ mode: 'detach' })
   } else {
     void win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'))
+  }
+
+  // 桌面开发模式（默认）：vite build --watch 持续重建 dist，这里监听产物变化自动刷新窗口。
+  // 之所以不用 dev server：dev server 是 http://localhost origin，IndexedDB 与打包版（file://）不互通，
+  // 会看不到真实项目数据；走 file:// 才能与桌面版共用同一份数据。
+  if (RELOAD_ON_BUILD) {
+    let timer = null
+    try {
+      fs.watch(path.join(__dirname, '..', 'dist'), { recursive: true }, () => {
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => {
+          for (const w of BrowserWindow.getAllWindows()) {
+            if (!w.isDestroyed()) w.webContents.reloadIgnoringCache()
+          }
+        }, 500)
+      })
+    } catch {
+      // 监听失败不影响开发（窗口内手动刷新即可）
+    }
   }
 }
 
