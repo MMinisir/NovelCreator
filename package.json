@@ -15,7 +15,8 @@
     "dev:exe": "node scripts/dev-desktop.mjs",
     "dist:exe": "node scripts/build-desktop.mjs",
     "dist:exe:minor": "node scripts/build-desktop.mjs --minor",
-    "dist:exe:major": "node scripts/build-desktop.mjs --major"
+    "dist:exe:major": "node scripts/build-desktop.mjs --major",
+    "dist:setup": "node scripts/build-desktop.mjs --installer --no-bump"
   },
   "dependencies": {
     "@tiptap/extension-placeholder": "^2.27.3",
@@ -71,6 +72,15 @@
     },
     "portable": {
       "artifactName": "NovelCreator-v${version}.${ext}"
+    },
+    "nsis": {
+      "artifactName": "NovelCreator-Setup-v${version}.${ext}",
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "NovelCreator"
     }
   }
 }

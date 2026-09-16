@@ -137,7 +137,8 @@ npm run electron:dev
 | `npm run build:electron` | 桌面模式构建（相对资源路径、关闭 SW） |
 | `npm run dev:exe` | **桌面开发模式**（推荐）：与桌面版共用 `file://` 数据，保存代码自动重建并刷新窗口；加 `-- --hmr` 则改用 dev server（真 HMR，数据独立） |
 | `npm run electron:dev` | 构建后启动桌面窗口（验证生产构建表现） |
-| `npm run dist:exe` | 一键打包 Windows 单文件便携版 exe |
+| `npm run dist:exe` | 一键打包 Windows 单文件便携版 exe（自动升版本号） |
+| `npm run dist:setup` | 打包 Windows 安装包（NSIS，沿用当前版本号） |
 
 ---
 
@@ -166,7 +167,18 @@ npm run dist:exe -- --version=2.0.0    # 指定版本号
 4. 复制为 `release-desktop/NovelCreator-v<版本>.exe`（约 100 MB，**双击即用、免安装**）
 5. **清理旧版本** exe 与历史 `release*` 产物目录
 
-> 默认仅产出当前平台的 Windows x64 便携版。如需 NSIS 安装包或 macOS / Linux 产物，可在 `package.json` 的 `build.win.target` 中调整，或补充对应平台配置。
+### Windows 安装包（NSIS）
+
+```bash
+npm run dist:setup                  # 为当前版本补一个安装包（沿用版本号，不升版本）
+npm run dist:exe -- --installer     # 同时升级版本号并打安装包
+```
+
+- 产物：`release-desktop/NovelCreator-Setup-v<版本>.exe`
+- 可选安装目录、创建桌面与开始菜单快捷方式、自带卸载程序
+- 与便携版同一版本号，**两种格式可并存**于 `release-desktop/`（每次打包只会清理**其它版本**的产物）
+
+> 默认目标为 Windows x64。如需 macOS / Linux 产物，可补充对应平台配置（`build.mac` / `build.linux`）。
 
 ---
 

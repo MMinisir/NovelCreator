@@ -52,7 +52,7 @@
 | `components/ai/PromptTemplatePicker.tsx` | 生成入口的「模板」选择行：选项 = 内置默认（含用户覆盖）+ 作用于该任务的自定义模板；该任务无自定义模板时不渲染任何内容（入口界面不变）；选中值存入口 state（`tplId`），生成与预览通过 `customContentById(tplId)` 传入 build/tasks |
 | `components/ai/ChapterContentModal.tsx` | **章节正文生成**：写作区章节头部「AI 写正文」打开；填写「本章要写什么 / 目标字数 / 风格视角」；自动带入本章大纲细纲（title+content+场景目标·冲突·结果）、出场人物一句话简介（优先 `outlineNode.characterIds`，否则项目前 8 人）、上一章结尾（纯文本尾部 500 字）、项目速览（`buildProjectContextBrief`，写作页直接从 `services/ai/contextBuilder` 导入，避免把 AI 任务层拉进写作页）；生成结果可编辑，按「追加到正文末尾 / 替换整章正文」写入 TipTap 正文（`textToHtmlParagraphs` → `scheduleSave` 自动保存与快照）；同样支持粘贴填充、提示预览、模板选择（kind=`chapterContent`） |
 | `scripts/dev-desktop.mjs` | **桌面开发模式**（`npm run dev:exe`）：**默认** `tsc -b` + `vite build --watch --mode electron` 持续重建 dist → Electron 以 **file://** 加载（与打包版**共用同一份 IndexedDB 数据**，能看到真实项目），产物变化自动刷新窗口（主进程 `NC_RELOAD_ON_BUILD`）；`npm run dev:exe -- --hmr` 改为 Vite dev server + `VITE_DEV_SERVER_URL`（真 HMR，但数据与桌面版隔离）；退出时按进程树清理（Windows `taskkill /T /F`）|
-| `scripts/build-desktop.mjs` | **桌面版一键打包**（`npm run dist:exe`）：自动升版本号（patch/minor/major/指定）→ electron 模式建前端 → electron-builder 出**单文件便携版**（输出到系统临时目录）→ 复制为 `release-desktop/NovelCreator-v<version>.exe` → 清理旧版本与历史 `release*` 目录。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
+| `scripts/build-desktop.mjs` | **桌面版一键打包**（便携版 / 安装包共用）：升版本号（patch/minor/major/`--version=`，或 `--no-bump` 沿用当前版本）→ electron 模式建前端 → electron-builder 出产物（输出到系统临时目录）→ 复制到 `release-desktop/` → 清理**其它版本**与中间产物（同版本多格式并存）。默认 `portable` 出 `NovelCreator-v<version>.exe`；`--installer` 出 NSIS 安装包 `NovelCreator-Setup-v<version>.exe`（artifactName 按目标分别传 `--config.nsis.artifactName` / `--config.portable.artifactName`，二者比 `win.artifactName` 更具体会覆盖之）。全程用 `node <本地 CLI 入口>` 执行，规避 Windows 下 `spawnSync npm.cmd` 的 EINVAL 与 shell 转义问题 |
 | `stores/settingsStore.ts` | **全局应用设置**（跨项目、localStorage；外观主题 theme（light/dark，默认 light）、界面字号、写作区字号、侧栏收起 sidebarCollapsed）；`applyTheme()` 在 `<html>` 上切 `.dark` 类并设 `color-scheme`，由 `main.tsx` 启动 `load()` 在首帧前应用 |：`uiFontSize`（界面根字号 14–20px，改 `document.documentElement.style.fontSize`，Tailwind 尺寸基于 rem 故整体缩放）与 `editorFontSize`（写作区正文字号 14–30px，经 CSS 变量 `--editor-font-size` 注入）；`load()` 在 main.tsx 首帧前调用避免闪动；AI 配置仍由 `services/ai/config.ts` 管理（同为本机全局） |
 | `pages/AppSettingsPage.tsx` | **全局设置页**（路由 `/settings`，顶栏「设置」入口）：界面字号滑块 + 快捷档（15/16/18/20px）、写作区正文字号滑块 + 快捷档（14–28px）+ 正文实时预览、恢复默认；右列复用 `AIConfigPanel`（AI Key 已从项目设置迁到这里）+ AI 配置说明（本机存储、不随项目导出） |
 | `electron/main.cjs` | Electron 主进程（CommonJS）：1480×940 窗口（`autoHideMenuBar`、`backgroundColor #faf8f5`）、`contextIsolation/sandbox` 开、`nodeIntegration` 关；生产 `loadFile(dist/index.html)`、开发读 `VITE_DEV_SERVER_URL`；`setWindowOpenHandler` + `will-navigate` 把外部 http(s) 交系统浏览器；`requestSingleInstanceLock` 单实例 |
@@ -146,7 +146,13 @@
 
 ## 8. 最近变更
 
-### 本轮（主题系统：浅色 / 暗色）
+### 本轮（Windows 安装包 NSIS）
+- `scripts/build-desktop.mjs` 扩展为「便携版 / 安装包共用一套流程」：新增 `--installer`（打 NSIS 安装包，产物 `NovelCreator-Setup-v<version>.exe`）与 `--no-bump`（沿用当前版本号，用于给已有版本补另一种格式）；artifactName 按目标分别传 `--config.nsis.artifactName` / `--config.portable.artifactName`。
+- 清理策略升级：`release-desktop/` 内由「只留单个 exe」改为「**保留当前版本的全部产物**、删除其它版本与中间产物」——因此同一版本的便携版与安装包可以并存。
+- `package.json`：新增 `nsis` 配置块（artifactName + `oneClick:false`、`perMachine:false`、允许更改安装目录、创建桌面/开始菜单快捷方式、shortcutName）与 `dist:setup` 脚本（= `--installer --no-bump`）。
+- 实测：为 v0.1.5 生成 `release-desktop/NovelCreator-Setup-v0.1.5.exe`（113.1 MB），便携版 `NovelCreator-v0.1.5.exe` 同时保留。
+
+### 上轮（主题系统：浅色 / 暗色）
 - **实现方式（关键，不要改回逐组件写 dark:）**：利用 Tailwind v4「工具类引用 CSS 变量」的特性——在 `index.css` 的 `html.dark { … }` 里重定义 `--color-stone-*`、`--color-violet-*`、`--color-red/emerald/amber/sky/rose/orange-*` 等变量即可整站换肤，组件一行都不用改。灰阶 `stone` 整体反转（浅底↔深底、深字↔亮字）；彩色只反转「浅底 / 深字」档（50–300 与 700–900），主色档 500–700 保持（主按钮、进度条、色块、卡片封面）。**以后新增配色直接用这些常规档位即可自动适配暗色。**
 - **必须单独覆盖的例外**（都写在 index.css 主题区块内）：① `.bg-white` / `.bg-white\/90` / `.bg-white\/95` → 深色表面（**不能**改 `--color-white`，否则 `text-white` 会变成深色）；② `.bg-stone-900\/40` → Modal 遮罩（文字用的 stone-900 已被反转成亮色，遮罩需单独压深）；③ `.text-violet-600`/`.text-violet-700`/`.text-red-600`/`.text-emerald-600`/`.text-sky-600` → 深底上对比度不足，作为文字时提亮；④ `body` 的底色与默认文字（用的是 `--color-ink-50/900`，不走 Tailwind 灰阶）；⑤ 滚动条颜色；⑥ `.prose-editor` / `.rich-display` 中原先硬编码的 rgb() 色改为引用变量（浅色下等价，暗色自动适配）。
 - **切换入口**：顶栏右侧月亮/太阳按钮（`AppLayout`，一键切换）+ 设置页「外观主题」卡片（`AppSettingsPage`，浅色/暗色）。状态存 `settingsStore.theme`（localStorage `novel-creator.theme.v1`），`main.tsx` 启动时 `load()` 在首帧前应用避免闪烁；设置页「恢复默认」回到浅色。已知小瑕疵：Electron 窗口 `backgroundColor` 固定浅色，暗色下启动瞬间会闪一下白（无害）。
