@@ -109,7 +109,7 @@ export default function EventsPage() {
           }
         />
       ) : (
-        <ul className="relative space-y-3">
+        <ul className="relative space-y-3 pb-20">
           {sorted.map((e) => (
             <li
               key={e.id}
@@ -179,6 +179,17 @@ export default function EventsPage() {
           ))}
         </ul>
       )}
+
+      {/* 悬浮「新建事件」：列表滚动到任何位置都能随手新增（z-30 低于弹窗 z-50） */}
+      <button
+        type="button"
+        onClick={() => setCreating(true)}
+        title="新建事件"
+        aria-label="新建事件"
+        className="fixed bottom-6 right-6 z-30 inline-flex cursor-pointer items-center gap-2 rounded-full bg-violet-700 px-5 py-3 text-sm font-medium text-white shadow-lg shadow-violet-900/25 transition-all hover:bg-violet-800 hover:shadow-xl active:scale-95"
+      >
+        <Plus className="size-4" /> 新建事件
+      </button>
 
       {(creating || editing) && (
         <EventFormModal

@@ -146,7 +146,12 @@
 
 ## 8. 最近变更
 
-### 本轮（Windows 安装包 NSIS）
+### 本轮（事件页：悬浮「新建事件」按钮）
+- `pages/project/EventsPage.tsx` 右下角新增**常驻悬浮按钮**（`fixed bottom-6 right-6 z-30`，紫色胶囊 + 阴影 + `active:scale-95`，`title/aria-label="新建事件"`），列表滚到任意位置都能随手新增；顶部工具栏原有的「新建事件」按钮**保留**（不减少入口）。
+- 列表容器 `<ul>` 加 `pb-20`，避免最后一条记录被悬浮按钮遮住；`z-30` 低于弹窗的 `z-50`，所以打开新建/编辑弹窗时不会有按钮浮在弹窗上。
+- 同类列表页（人物 / 地点 / 伏笔 / 灵感 / 章节等）暂未改动，如需一并加悬浮新增按钮可复用同一写法（fixed 右下角 + 列表底部留白 + z-30）。
+
+### 上轮（Windows 安装包 NSIS）
 - `scripts/build-desktop.mjs` 扩展为「便携版 / 安装包共用一套流程」：新增 `--installer`（打 NSIS 安装包，产物 `NovelCreator-Setup-v<version>.exe`）与 `--no-bump`（沿用当前版本号，用于给已有版本补另一种格式）；artifactName 按目标分别传 `--config.nsis.artifactName` / `--config.portable.artifactName`。
 - 清理策略升级：`release-desktop/` 内由「只留单个 exe」改为「**保留当前版本的全部产物**、删除其它版本与中间产物」——因此同一版本的便携版与安装包可以并存。
 - `package.json`：新增 `nsis` 配置块（artifactName + `oneClick:false`、`perMachine:false`、允许更改安装目录、创建桌面/开始菜单快捷方式、shortcutName）与 `dist:setup` 脚本（= `--installer --no-bump`）。
